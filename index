@@ -14,7 +14,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 
     <style>
-        /* Ton style reste inchangé */
         body {
             font-family: Arial, sans-serif;
             background-color: #f5f5f5;
@@ -37,7 +36,6 @@
     <div id="result">Chargement...</div>
 
     <script>
-        // Configuration Firebase
         const firebaseConfig = {
             apiKey: "AIzaSy...", // Remplace par ta vraie clé API
             authDomain: "verif-clients-f5915.firebaseapp.com",
@@ -51,25 +49,23 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // Récupération de l'ID client dans l'URL
         const urlParams = new URLSearchParams(window.location.search);
         const id = urlParams.get('id');
         const token = urlParams.get('token');
 
-        // Vérification blacklist et clé
         async function verifier() {
             if (!id || !token) {
                 document.getElementById('result').innerHTML = "Lien invalide";
                 return;
             }
 
-            const blacklistSnap = await db.ref("blacklist/" + id).get();
+            const blacklistSnap = await db.ref("blacklist/" + id).once("value");
             if (blacklistSnap.exists()) {
                 document.getElementById('result').innerHTML = "Client <b>non validé</b> (blacklisté)";
                 return;
             }
 
-            const cleSnap = await db.ref("config/cleAES").get();
+            const cleSnap = await db.ref("config/cleAES").once("value");
             if (!cleSnap.exists()) {
                 document.getElementById('result').innerHTML = "Erreur de clé de sécurité.";
                 return;
@@ -90,3 +86,4 @@
 </body>
 
 </html>
+

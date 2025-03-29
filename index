@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vérification Client</title>
+    <title>Vérification Client - Debug</title>
 
     <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -28,15 +28,22 @@
             font-size: 1.2em;
             color: green;
         }
+        pre {
+            text-align: left;
+            background: #eee;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
     </style>
 </head>
 
 <body>
-    <h1>Vérification de l'attestation</h1>
+    <h1>Vérification de l'attestation (Mode Debug)</h1>
     <div id="result">Chargement...</div>
+    <pre id="debug"></pre>
 
     <script>
-        // Configuration Firebase
         const firebaseConfig = {
             apiKey: "AIzaSy...", // Remplace par ta vraie clé API
             authDomain: "verif-clients-f5915.firebaseapp.com",
@@ -50,46 +57,55 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // Récupération des paramètres d'URL
+        const debug = (msg) => {
+            document.getElementById('debug').innerHTML += msg + "\n";
+            console.log(msg);
+        };
+
         const urlParams = new URLSearchParams(window.location.search);
         const id = urlParams.get('id');
         const token = urlParams.get('token');
 
+        debug("Paramètre ID = " + id);
+        debug("Paramètre Token = " + token);
+
         async function verifier() {
             if (!id || !token) {
                 document.getElementById('result').innerHTML = "Lien invalide";
+                debug("Erreur : Lien invalide");
                 return;
             }
 
-            try {
-                // Vérification blacklist
-                const blacklistSnap = await db.ref("blacklist/" + id).once("value");
-                if (blacklistSnap.exists()) {
-                    document.getElementById('result').innerHTML = "Client <b>non validé</b> (blacklisté)";
-                    return;
-                }
+            const blacklistSnap = await db.ref("blacklist/" + id).once("value");
+            debug("Blacklist existe : " + blacklistSnap.exists());
 
-                // Récupération de la clé AES
-                const cleSnap = await db.ref("config/cleAES").once("value");
-                const cleData = cleSnap.val();
+            if (blacklistSnap.exists()) {
+                document.getElementById('result').innerHTML = "Client <b>non validé</b> (blacklisté)";
+                debug("Erreur : Client blacklisté");
+                return;
+            }
 
-                if (!cleData || !cleData.cle) {
-                    document.getElementById('result').innerHTML = "Erreur de clé de sécurité.";
-                    return;
-                }
+            const cleSnap = await db.ref("config/cleAES").once("value");
+            debug("Clé trouvée : " + cleSnap.exists());
 
-                const cleAES = cleData.cle.toString();
+            if (!cleSnap.exists()) {
+                document.getElementById('result').innerHTML = "Erreur de clé de sécurité.";
+                debug("Erreur : Clé AES non trouvée");
+                return;
+            }
 
-                // Déchiffrement
-                const decrypted = CryptoJS.AES.decrypt(token, cleAES).toString(CryptoJS.enc.Utf8);
+            const cleAES = cleSnap.val();
+            debug("Clé AES : " + cleAES);
 
-                if (decrypted === id) {
-                    document.getElementById('result').innerHTML = "Client <b>validé</b> ✅";
-                } else {
-                    document.getElementById('result').innerHTML = "Client <b>non validé</b> (mauvais token)";
-                }
-            } catch (error) {
-                document.getElementById('result').innerHTML = "Erreur : " + error.message;
+            const decrypted = CryptoJS.AES.decrypt(token, cleAES).toString(CryptoJS.enc.Utf8);
+            debug("Déchiffrement résultat : " + decrypted);
+
+            if (decrypted === id) {
+                document.getElementById('result').innerHTML = "Client <b>validé</b> ✅";
+                debug("Succès : Client validé");
+            } else {
+                document.getElementById('result').innerHTML = "Client <b>non validé</b> (mauvais token)";
+                debug("Erreur : Mauvais token");
             }
         }
 

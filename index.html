@@ -1,116 +1,103 @@
 <!DOCTYPE html>
 <html lang="fr">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vérification Client - Debug</title>
-
-    <!-- Firebase -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-
-    <!-- CryptoJS -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-
+    <title>Vérification</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f5f5f5;
-            text-align: center;
-            padding: 50px;
+        body{margin:0!important}
+        #date_annulation {
+            color: red;
         }
-        h1 {
-            color: #333;
+        .info {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #a5d7a7;
+            line-height: 1.5;
+            margin-bottom: 15px;
+            border-radius: 10px;
+            padding: 5px 10px;
+            box-sizing: border-box;
         }
-        #result {
-            margin-top: 20px;
-            font-size: 1.2em;
-            color: green;
-        }
-        pre {
-            text-align: left;
-            background: #eee;
-            padding: 10px;
-            border-radius: 5px;
-            overflow-x: auto;
+        .info p {
+            margin: 0;
+            padding: 5px 0;
         }
     </style>
 </head>
-
 <body>
-    <h1>Vérification de l'attestation (Mode Debug)</h1>
-    <div id="result">Chargement...</div>
-    <pre id="debug"></pre>
+    <app-root _nghost-sst-c43 ng-version="13.0.3">
+        <div _ngcontent-sst-c43 style="padding:5px" class="ng-star-inserted">
+            <div _ngcontent-sst-c43>
+                <img _ngcontent-sst-c43 src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/" alt="Logo CASNOS" width=100% height=170px>
+                <div _ngcontent-sst-c43>
+                    <div _ngcontent-sst-c43 style=font-weight:600;text-align:center;margin-bottom:10px;color:#4caf50;margin-top:16px class=ng-star-inserted>
+                        <div _ngcontent-sst-c43 style=font-size:18px;margin-bottom:8px>Attestation authentique</div>
+                        <div _ngcontent-sst-c43 style=color:#f77a7a>Veuillez vérifier les informations personelles</div>
+                    </div>
+                </div>
+                <div _ngcontent-sst-c43 class="info">
+                    <p><strong>Matricule :</strong> <span id="matricule"></span></p>
+                    <p><strong>N° attestation :</strong> <span id="num_attest"></span></p>
+                    <p><strong>Nom :</strong> <span id="nom"></span></p>
+                    <p><strong>Prénom :</strong> <span id="prenom"></span></p>
+                    <p><strong>Date de naissance :</strong> <span id="date_naissance"></span></p>
+                    <p><strong>Date mise à jour :</strong> <span id="date_maj"></span></p>
+                    <p><strong>Date d'annulation :</strong> <span id="date_annulation"></span></p>
+                </div>
+            </div>
+        </div>
+    </app-root>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script>
-        const firebaseConfig = {
-            apiKey: "AIzaSyA4fkmfRxjuNEXWbOMOlBsIq2N6lZnd4ps",
-            authDomain: "verif-clients-f5915.firebaseapp.com",
-            databaseURL: "https://verif-clients-f5915-default-rtdb.firebaseio.com/",
-            projectId: "verif-clients-f5915",
-            storageBucket: "verif-clients-f5915.appspot.com",
-            messagingSenderId: "914666601909",
-            appId: "1:914666601909:web:286ad5057da0ac0ea46dfc"
-        };
+        const AES_KEY = "vGX8!jkd72p$";
+        const BLACKLIST = ["99999", "88888"];
 
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
+        function afficherErreur(message) {
+            document.body.innerHTML = '<h2 style="color:red;text-align:center;">' + message + '</h2>';
+        }
 
-        const debug = (msg) => {
-            document.getElementById('debug').innerHTML += msg + "\n";
-            console.log(msg);
-        };
+        function verifierClient() {
+            const params = new URLSearchParams(window.location.search);
+            const id = params.get("id");
+            const token = params.get("token");
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const id = urlParams.get('id');
-        const token = urlParams.get('token');
-
-        debug("Paramètre ID = " + id);
-        debug("Paramètre Token = " + token);
-
-        async function verifier() {
             if (!id || !token) {
-                document.getElementById('result').innerHTML = "Lien invalide";
-                debug("Erreur : Lien invalide");
+                afficherErreur("Lien invalide (paramètres manquants)");
                 return;
             }
 
-            const blacklistSnap = await db.ref("blacklist/" + id).once("value");
-            debug("Blacklist existe : " + blacklistSnap.exists());
-
-            if (blacklistSnap.exists()) {
-                document.getElementById('result').innerHTML = "Client <b>non validé</b> (blacklisté)";
-                debug("Erreur : Client blacklisté");
+            if (BLACKLIST.includes(id)) {
+                afficherErreur("Client non validé (BlackList)");
                 return;
             }
 
-            const cleSnap = await db.ref("config/cleAES").once("value");
-            debug("Clé trouvée : " + cleSnap.exists());
+            try {
+                const bytes = CryptoJS.AES.decrypt(token, AES_KEY);
+                const decryptedData = bytes.toString(CryptoJS.enc.Utf8);
+                const dataParts = decryptedData.split("|");
+                if (dataParts[0] !== id) {
+                    afficherErreur("Client non validé (mauvais token)");
+                    return;
+                }
+                const [matricule, num_attest, nom, prenom, date_naissance, date_maj, date_annulation] = dataParts;
 
-            if (!cleSnap.exists()) {
-                document.getElementById('result').innerHTML = "Erreur de clé de sécurité.";
-                debug("Erreur : Clé AES non trouvée");
-                return;
-            }
+                document.getElementById("matricule").textContent = matricule || "Non défini";
+                document.getElementById("num_attest").textContent = num_attest || "Non défini";
+                document.getElementById("nom").textContent = nom || "Non défini";
+                document.getElementById("prenom").textContent = prenom || "Non défini";
+                document.getElementById("date_naissance").textContent = date_naissance || "Non défini";
+                document.getElementById("date_maj").textContent = date_maj || "Non défini";
+                document.getElementById("date_annulation").textContent = date_annulation || "Non défini";
 
-            const cleAES = cleSnap.val();
-            debug("Clé AES : " + cleAES);
-
-            const decrypted = CryptoJS.AES.decrypt(token, cleAES).toString(CryptoJS.enc.Utf8);
-            debug("Déchiffrement résultat : " + decrypted);
-
-            if (decrypted === id) {
-                document.getElementById('result').innerHTML = "Client <b>validé</b> ✅";
-                debug("Succès : Client validé");
-            } else {
-                document.getElementById('result').innerHTML = "Client <b>non validé</b> (mauvais token)";
-                debug("Erreur : Mauvais token");
+            } catch (e) {
+                afficherErreur("Erreur lors du déchiffrement");
             }
         }
 
-        verifier();
+        verifierClient();
     </script>
 </body>
-
 </html>

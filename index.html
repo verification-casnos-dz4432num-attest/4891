@@ -1,26 +1,35 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test Token</title>
-</head>
-<body>
-    <h2>Vérification du Token</h2>
-    <p id="info"></p>
+// Fonction pour décrypter le token AES
+function decryptAES(encryptedText) {
+    const key = CryptoJS.enc.Utf8.parse("vGX8!jkd72p$"); // Ta clé secrète AES
+    const decrypted = CryptoJS.AES.decrypt(encryptedText, key, { mode: CryptoJS.mode.ECB });
+    return decrypted.toString(CryptoJS.enc.Utf8);
+}
 
-    <script>
-        // Récupérer les paramètres de l'URL
-        const params = new URLSearchParams(window.location.search);
-        const id = params.get("id");
-        const token = params.get("token");
+// Récupérer les paramètres de l'URL
+const urlParams = new URLSearchParams(window.location.search);
+const clientId = urlParams.get("id");
+const token = urlParams.get("token");
 
-        // Afficher les valeurs récupérées sur la page
-        document.getElementById("info").innerText = "ID: " + id + " | Token: " + token;
+// Afficher dans la console pour vérifier les valeurs reçues
+console.log("ID reçu :", clientId);
+console.log("Token avant déchiffrement :", token);
 
-        // Afficher aussi dans la console
-        console.log("ID reçu :", id);
-        console.log("Token reçu :", token);
-    </script>
-</body>
-</html>
+if (clientId && token) {
+    try {
+        // Déchiffrer le token
+        let decryptedToken = decryptAES(token);
+        console.log("Token déchiffré :", decryptedToken);
+
+        // Vérifier si le token est valide
+        if (decryptedToken === clientId) {
+            document.body.innerHTML = `<h2>Vérification réussie ✅</h2><p>ID : ${clientId}</p>`;
+        } else {
+            document.body.innerHTML = `<h2>Client non validé ❌</h2><p>Mauvais token</p>`;
+        }
+    } catch (error) {
+        console.error("Erreur lors du déchiffrement :", error);
+        document.body.innerHTML = `<h2>Erreur ❌</h2><p>Impossible de déchiffrer le token.</p>`;
+    }
+} else {
+    document.body.innerHTML = `<h2>Paramètres manquants ❌</h2>`;
+}

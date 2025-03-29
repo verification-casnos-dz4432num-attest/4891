@@ -1,7 +1,16 @@
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+<script>
 // Fonction pour décrypter le token AES
 function decryptAES(encryptedText) {
-    const key = CryptoJS.enc.Utf8.parse("vGX8!jkd72p$"); // Ta clé secrète AES
-    const decrypted = CryptoJS.AES.decrypt(encryptedText, key, { mode: CryptoJS.mode.ECB });
+    const key = CryptoJS.enc.Utf8.parse("vGX8!jkd72p$1234"); // 16 caractères
+    const decrypted = CryptoJS.AES.decrypt(
+        decodeURIComponent(encryptedText), // On décode proprement l'URL
+        key,
+        {
+            mode: CryptoJS.mode.ECB,
+            padding: CryptoJS.pad.Pkcs7
+        }
+    );
     return decrypted.toString(CryptoJS.enc.Utf8);
 }
 
@@ -22,14 +31,27 @@ if (clientId && token) {
 
         // Vérifier si le token est valide
         if (decryptedToken === clientId) {
-            document.body.innerHTML = `<h2>Vérification réussie ✅</h2><p>ID : ${clientId}</p>`;
+            document.body.innerHTML = `
+                <h2>Vérification réussie ✅</h2>
+                <p>ID : ${clientId}</p>
+            `;
         } else {
-            document.body.innerHTML = `<h2>Client non validé ❌</h2><p>Mauvais token</p>`;
+            document.body.innerHTML = `
+                <h2>Client non validé ❌</h2>
+                <p>Mauvais token</p>
+            `;
         }
     } catch (error) {
         console.error("Erreur lors du déchiffrement :", error);
-        document.body.innerHTML = `<h2>Erreur ❌</h2><p>Impossible de déchiffrer le token.</p>`;
+        document.body.innerHTML = `
+            <h2>Erreur ❌</h2>
+            <p>Impossible de déchiffrer le token.</p>
+        `;
     }
 } else {
-    document.body.innerHTML = `<h2>Paramètres manquants ❌</h2>`;
+    document.body.innerHTML = `
+        <h2>Paramètres manquants ❌</h2>
+        <p>Veuillez fournir un ID et un token.</p>
+    `;
 }
+</script>

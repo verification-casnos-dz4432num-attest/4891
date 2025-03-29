@@ -36,6 +36,7 @@
     <div id="result">Chargement...</div>
 
     <script>
+        // Configuration Firebase
         const firebaseConfig = {
             apiKey: "AIzaSy...", // Remplace par ta vraie clé API
             authDomain: "verif-clients-f5915.firebaseapp.com",
@@ -49,6 +50,7 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
+        // Récupération des paramètres d'URL
         const urlParams = new URLSearchParams(window.location.search);
         const id = urlParams.get('id');
         const token = urlParams.get('token');
@@ -59,25 +61,35 @@
                 return;
             }
 
-            const blacklistSnap = await db.ref("blacklist/" + id).once("value");
-            if (blacklistSnap.exists()) {
-                document.getElementById('result').innerHTML = "Client <b>non validé</b> (blacklisté)";
-                return;
-            }
+            try {
+                // Vérification blacklist
+                const blacklistSnap = await db.ref("blacklist/" + id).once("value");
+                if (blacklistSnap.exists()) {
+                    document.getElementById('result').innerHTML = "Client <b>non validé</b> (blacklisté)";
+                    return;
+                }
 
-            const cleSnap = await db.ref("config/cleAES").once("value");
-            if (!cleSnap.exists()) {
-                document.getElementById('result').innerHTML = "Erreur de clé de sécurité.";
-                return;
-            }
+                // Récupération de la clé AES
+                const cleSnap = await db.ref("config/cleAES").once("value");
+                const cleData = cleSnap.val();
 
-            const cleAES = cleSnap.val();
-            const decrypted = CryptoJS.AES.decrypt(token, cleAES).toString(CryptoJS.enc.Utf8);
+                if (!cleData || !cleData.cle) {
+                    document.getElementById('result').innerHTML = "Erreur de clé de sécurité.";
+                    return;
+                }
 
-            if (decrypted === id) {
-                document.getElementById('result').innerHTML = "Client <b>validé</b> ✅";
-            } else {
-                document.getElementById('result').innerHTML = "Client <b>non validé</b> (mauvais token)";
+                const cleAES = cleData.cle.toString();
+
+                // Déchiffrement
+                const decrypted = CryptoJS.AES.decrypt(token, cleAES).toString(CryptoJS.enc.Utf8);
+
+                if (decrypted === id) {
+                    document.getElementById('result').innerHTML = "Client <b>validé</b> ✅";
+                } else {
+                    document.getElementById('result').innerHTML = "Client <b>non validé</b> (mauvais token)";
+                }
+            } catch (error) {
+                document.getElementById('result').innerHTML = "Erreur : " + error.message;
             }
         }
 
@@ -86,4 +98,3 @@
 </body>
 
 </html>
-

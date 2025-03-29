@@ -45,13 +45,13 @@
 
     <script>
         const firebaseConfig = {
-            apiKey: "AIzaSy...", // Remplace par ta vraie clé API
+            apiKey: "AIzaSyA4fkmfRxjuNEXWbOMOlBsIq2N6lZnd4ps",
             authDomain: "verif-clients-f5915.firebaseapp.com",
             databaseURL: "https://verif-clients-f5915-default-rtdb.firebaseio.com/",
             projectId: "verif-clients-f5915",
             storageBucket: "verif-clients-f5915.appspot.com",
-            messagingSenderId: "...",
-            appId: "..."
+            messagingSenderId: "914666601909",
+            appId: "1:914666601909:web:286ad5057da0ac0ea46dfc"
         };
 
         firebase.initializeApp(firebaseConfig);

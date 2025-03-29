@@ -3,101 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vérification</title>
-    <style>
-        body{margin:0!important}
-        #date_annulation {
-            color: red;
-        }
-        .info {
-            width: 100%;
-            display: flex;
-            flex-direction: column;
-            border: 1px solid #a5d7a7;
-            line-height: 1.5;
-            margin-bottom: 15px;
-            border-radius: 10px;
-            padding: 5px 10px;
-            box-sizing: border-box;
-        }
-        .info p {
-            margin: 0;
-            padding: 5px 0;
-        }
-    </style>
+    <title>Test Token</title>
 </head>
 <body>
-    <app-root _nghost-sst-c43 ng-version="13.0.3">
-        <div _ngcontent-sst-c43 style="padding:5px" class="ng-star-inserted">
-            <div _ngcontent-sst-c43>
-                <img _ngcontent-sst-c43 src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/" alt="Logo CASNOS" width=100% height=170px>
-                <div _ngcontent-sst-c43>
-                    <div _ngcontent-sst-c43 style=font-weight:600;text-align:center;margin-bottom:10px;color:#4caf50;margin-top:16px class=ng-star-inserted>
-                        <div _ngcontent-sst-c43 style=font-size:18px;margin-bottom:8px>Attestation authentique</div>
-                        <div _ngcontent-sst-c43 style=color:#f77a7a>Veuillez vérifier les informations personelles</div>
-                    </div>
-                </div>
-                <div _ngcontent-sst-c43 class="info">
-                    <p><strong>Matricule :</strong> <span id="matricule"></span></p>
-                    <p><strong>N° attestation :</strong> <span id="num_attest"></span></p>
-                    <p><strong>Nom :</strong> <span id="nom"></span></p>
-                    <p><strong>Prénom :</strong> <span id="prenom"></span></p>
-                    <p><strong>Date de naissance :</strong> <span id="date_naissance"></span></p>
-                    <p><strong>Date mise à jour :</strong> <span id="date_maj"></span></p>
-                    <p><strong>Date d'annulation :</strong> <span id="date_annulation"></span></p>
-                </div>
-            </div>
-        </div>
-    </app-root>
+    <h2>Vérification du Token</h2>
+    <p id="info"></p>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script>
-        const AES_KEY = "vGX8!jkd72p$";
-        const BLACKLIST = ["99999", "88888"];
+        // Récupérer les paramètres de l'URL
+        const params = new URLSearchParams(window.location.search);
+        const id = params.get("id");
+        const token = params.get("token");
 
-        function afficherErreur(message) {
-            document.body.innerHTML = '<h2 style="color:red;text-align:center;">' + message + '</h2>';
-        }
+        // Afficher les valeurs récupérées sur la page
+        document.getElementById("info").innerText = "ID: " + id + " | Token: " + token;
 
-        function verifierClient() {
-            const params = new URLSearchParams(window.location.search);
-            const id = params.get("id");
-            const token = params.get("token");
-
-            if (!id || !token) {
-                afficherErreur("Lien invalide (paramètres manquants)");
-                return;
-            }
-
-            if (BLACKLIST.includes(id)) {
-                afficherErreur("Client non validé (BlackList)");
-                return;
-            }
-
-            try {
-                const bytes = CryptoJS.AES.decrypt(token, AES_KEY);
-                const decryptedData = bytes.toString(CryptoJS.enc.Utf8);
-                const dataParts = decryptedData.split("|");
-                if (dataParts[0] !== id) {
-                    afficherErreur("Client non validé (mauvais token)");
-                    return;
-                }
-                const [matricule, num_attest, nom, prenom, date_naissance, date_maj, date_annulation] = dataParts;
-
-                document.getElementById("matricule").textContent = matricule || "Non défini";
-                document.getElementById("num_attest").textContent = num_attest || "Non défini";
-                document.getElementById("nom").textContent = nom || "Non défini";
-                document.getElementById("prenom").textContent = prenom || "Non défini";
-                document.getElementById("date_naissance").textContent = date_naissance || "Non défini";
-                document.getElementById("date_maj").textContent = date_maj || "Non défini";
-                document.getElementById("date_annulation").textContent = date_annulation || "Non défini";
-
-            } catch (e) {
-                afficherErreur("Erreur lors du déchiffrement");
-            }
-        }
-
-        verifierClient();
+        // Afficher aussi dans la console
+        console.log("ID reçu :", id);
+        console.log("Token reçu :", token);
     </script>
 </body>
 </html>

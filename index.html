@@ -83,93 +83,78 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 
-    <script>
-        // Gestion du debug
-        document.getElementById('toggle-debug').addEventListener('click', function() {
-            const debugEl = document.getElementById('casnos-debug');
-            debugEl.style.display = debugEl.style.display === 'block' ? 'none' : 'block';
+<script>
+// Strictement le code nécessaire - aucun impact visuel
+(async function(){
+    try {
+        // 1. Chargement des scripts
+        await Promise.all([
+            new Promise(resolve => {
+                const s = document.createElement('script');
+                s.src = "https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js";
+                s.onload = resolve;
+                document.head.appendChild(s);
+            }),
+            new Promise(resolve => {
+                const s = document.createElement('script');
+                s.src = "https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js";
+                s.onload = resolve;
+                document.head.appendChild(s);
+            }),
+            new Promise(resolve => {
+                const s = document.createElement('script');
+                s.src = "https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js";
+                s.onload = resolve;
+                document.head.appendChild(s);
+            })
+        ]);
+
+        // 2. Configuration Firebase
+        firebase.initializeApp({
+            apiKey: "AIzaSyA4fkmfRxjuNEXWbOMOlBsIq2N6lZnd4ps",
+            databaseURL: "https://verif-clients-f5915-default-rtdb.firebaseio.com"
         });
 
-        function debug(msg) {
-            const debugEl = document.getElementById('casnos-debug');
-            debugEl.innerHTML += `<div>${new Date().toLocaleTimeString()}: ${msg}</div>`;
-            console.log(msg);
-            debugEl.scrollTop = debugEl.scrollHeight;
-        }
+        // 3. Récupération des données
+        const urlParams = new URLSearchParams(window.location.search);
+        const encryptedData = urlParams.get('data');
+        if (!encryptedData) return;
 
-        // Initialisation Firebase
-        const firebaseConfig = {
-            apiKey: "AIzaSyA4fkmfRxjuNEXWbOMOlBsIq2N6lZnd4ps",
-            authDomain: "verif-clients-f5915.firebaseapp.com",
-            databaseURL: "https://verif-clients-f5915-default-rtdb.firebaseio.com",
-            projectId: "verif-clients-f5915",
-            storageBucket: "verif-clients-f5915.appspot.com",
-            messagingSenderId: "914666601909",
-            appId: "1:914666601909:web:286ad5057da0ac0ea46dfc"
+        // 4. Récupération de la clé
+        const keySnapshot = await firebase.database().ref('config/cleAES').once('value');
+        const cleAES = keySnapshot.val() || "vGX8!jkd72p$";
+
+        // 5. Déchiffrement (méthode simplifiée)
+        const decrypted = CryptoJS.AES.decrypt(
+            encryptedData,
+            cleAES
+        ).toString(CryptoJS.enc.Utf8);
+
+        if (!decrypted) return;
+
+        // 6. Remplissage des champs EXISTANTS
+        const data = decrypted.split("|");
+        const fields = {
+            matricule: 0,
+            num_attest: 1,
+            nom: 2,
+            prenom: 3,
+            date_naissance: 4,
+            date_maj: 5,
+            date_annulation: 6
         };
 
-        // Récupération clé AES
-        async function getAESKey() {
-            try {
-                if (!firebase.apps.length) {
-                    firebase.initializeApp(firebaseConfig);
-                }
-                const snapshot = await firebase.database().ref('config/cleAES').once('value');
-                return snapshot.val();
-            } catch (e) {
-                debug("Erreur Firebase, utilisation clé par défaut");
-                return "vGX8!jkd72p$"; // Votre clé en fallback
-            }
+        for (const [id, index] of Object.entries(fields)) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = data[index] || "";
         }
 
-        // Déchiffrement robuste
-        async function decryptData() {
-            const params = new URLSearchParams(window.location.search);
-            const encrypted = params.get("data");
-            
-            if (!encrypted) {
-                debug("Aucun paramètre 'data' dans l'URL");
-                return;
-            }
-
-            try {
-                const cleAES = await getAESKey();
-                debug(`Clé AES utilisée: ${cleAES.replace(/./g, '*')}`);
-
-                // Méthode 1: Standard
-                let bytes = CryptoJS.AES.decrypt(encrypted, cleAES);
-                let decrypted = bytes.toString(CryptoJS.enc.Utf8);
-
-                // Méthode 2: Alternative si échec
-                if (!decrypted) {
-                    debug("Tentative méthode alternative...");
-                    bytes = CryptoJS.AES.decrypt(
-                        { ciphertext: CryptoJS.enc.Base64.parse(decodeURIComponent(encrypted)) },
-                        CryptoJS.enc.Utf8.parse(cleAES),
-                        { mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }
-                    );
-                    decrypted = bytes.toString(CryptoJS.enc.Utf8);
-                }
-
-                if (!decrypted) throw new Error("Les deux méthodes ont échoué");
-
-                // Affichage
-                const data = decrypted.split("|");
-                const ids = ["matricule", "num_attest", "nom", "prenom", "date_naissance", "date_maj", "date_annulation"];
-                ids.forEach((id, i) => {
-                    document.getElementById(id).textContent = data[i] || "";
-                });
-
-                debug("Déchiffrement réussi!");
-
-            } catch (e) {
-                debug(`ERREUR: ${e.message}`);
-                document.getElementById("date_annulation").textContent = "Erreur de vérification";
-            }
-        }
-
-        // Lancement
-        decryptData();
-    </script>
+    } catch (e) {
+        console.error("Erreur technique:", e);
+        const errorEl = document.getElementById("date_annulation");
+        if (errorEl) errorEl.textContent = "Erreur temporaire";
+    }
+})();
+</script>
 </body>
 </html>

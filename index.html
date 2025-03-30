@@ -1,58 +1,102 @@
 <!DOCTYPE html>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-<script>
-// Fonction pour décrypter le token AES
-function decryptAES(encryptedText) {
-    const key = CryptoJS.enc.Utf8.parse("vGX8!jkd72p$1234"); // 16 caractères
-    const decrypted = CryptoJS.AES.decrypt(
-        decodeURIComponent(encryptedText), // On décode proprement l'URL
-        key,
-        {
-            mode: CryptoJS.mode.ECB,
-            padding: CryptoJS.pad.Pkcs7
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vérification</title>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        body{margin:0!important}
+        #date_annulation { color: red; }
+        .info {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #a5d7a7;
+            line-height: 1.5;
+            margin-bottom: 15px;
+            border-radius: 10px;
+            padding: 5px 10px;
+            box-sizing: border-box;
         }
-    );
-    return decrypted.toString(CryptoJS.enc.Utf8);
-}
+        .info p { margin: 0; padding: 5px 0; }
+    </style>
+</head>
+<body>
+    <div class="info">
+        <p><strong>Matricule :</strong> <span id="matricule"></span></p>
+        <p><strong>N° attestation :</strong> <span id="num_attest"></span></p>
+        <p><strong>Nom :</strong> <span id="nom"></span></p>
+        <p><strong>Prénom :</strong> <span id="prenom"></span></p>
+        <p><strong>Date de naissance :</strong> <span id="date_naissance"></span></p>
+        <p><strong>Date mise à jour :</strong> <span id="date_maj"></span></p>
+        <p><strong>Date d'annulation :</strong> <span id="date_annulation"></span></p>
+    </div>
 
-// Récupérer les paramètres de l'URL
-const urlParams = new URLSearchParams(window.location.search);
-const clientId = urlParams.get("id");
-const token = urlParams.get("token");
+    <script>
+        const firebaseConfig = {
+            databaseURL: "https://verif-clients-f5915-default-rtdb.firebaseio.com/"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
 
-// Afficher dans la console pour vérifier les valeurs reçues
-console.log("ID reçu :", clientId);
-console.log("Token avant déchiffrement :", token);
-
-if (clientId && token) {
-    try {
-        // Déchiffrer le token
-        let decryptedToken = decryptAES(token);
-        console.log("Token déchiffré :", decryptedToken);
-
-        // Vérifier si le token est valide
-        if (decryptedToken === clientId) {
-            document.body.innerHTML = `
-                <h2>Vérification réussie ✅</h2>
-                <p>ID : ${clientId}</p>
-            `;
-        } else {
-            document.body.innerHTML = `
-                <h2>Client non validé ❌</h2>
-                <p>Mauvais token</p>
-            `;
+        async function getAESKey() {
+            const snapshot = await db.ref("config/cleAES").get();
+            return snapshot.exists() ? snapshot.val() : null;
         }
-    } catch (error) {
-        console.error("Erreur lors du déchiffrement :", error);
-        document.body.innerHTML = `
-            <h2>Erreur ❌</h2>
-            <p>Impossible de déchiffrer le token.</p>
-        `;
-    }
-} else {
-    document.body.innerHTML = `
-        <h2>Paramètres manquants ❌</h2>
-        <p>Veuillez fournir un ID et un token.</p>
-    `;
-}
-</script>
+
+        async function isBlacklisted(clientId) {
+            const snapshot = await db.ref(`blacklist/${clientId}`).get();
+            return snapshot.exists();
+        }
+
+        async function verifierClient() {
+            const params = new URLSearchParams(window.location.search);
+            const id = params.get("id");
+            const token = params.get("token");
+
+            if (!id || !token) {
+                document.body.innerHTML = '<h2 style="color:red;text-align:center;">Lien invalide</h2>';
+                return;
+            }
+
+            if (await isBlacklisted(id)) {
+                document.body.innerHTML = '<h2 style="color:red;text-align:center;">Client non validé (Blacklisté)</h2>';
+                return;
+            }
+
+            const aesKey = await getAESKey();
+            if (!aesKey) {
+                document.body.innerHTML = '<h2 style="color:red;text-align:center;">Erreur de configuration</h2>';
+                return;
+            }
+
+            try {
+                const bytes = CryptoJS.AES.decrypt(token, aesKey);
+                const decryptedData = bytes.toString(CryptoJS.enc.Utf8);
+                const dataParts = decryptedData.split("|");
+
+                if (dataParts[0] !== id) {
+                    document.body.innerHTML = '<h2 style="color:red;text-align:center;">Client non validé</h2>';
+                    return;
+                }
+
+                const [matricule, num_attest, nom, prenom, date_naissance, date_maj, date_annulation] = dataParts;
+                document.getElementById("matricule").textContent = matricule || "Non défini";
+                document.getElementById("num_attest").textContent = num_attest || "Non défini";
+                document.getElementById("nom").textContent = nom || "Non défini";
+                document.getElementById("prenom").textContent = prenom || "Non défini";
+                document.getElementById("date_naissance").textContent = date_naissance || "Non défini";
+                document.getElementById("date_maj").textContent = date_maj || "Non défini";
+                document.getElementById("date_annulation").textContent = date_annulation || "Non défini";
+            } catch (e) {
+                document.body.innerHTML = '<h2 style="color:red;text-align:center;">Erreur de déchiffrement</h2>';
+            }
+        }
+
+        verifierClient();
+    </script>
+</body>
+</html>

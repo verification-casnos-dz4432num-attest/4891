@@ -3,58 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vérification sécurisée</title>
+    <title>Vérification Sécurisée</title>
     <style>
-        body { margin: 0 !important; font-family: Arial, sans-serif; }
-        #date_annulation { color: red; }
-        .info {
-            width: 100%;
-            display: flex;
-            flex-direction: column;
-            border: 1px solid #a5d7a7;
-            line-height: 1.5;
-            margin-bottom: 15px;
-            border-radius: 10px;
-            padding: 5px 10px;
-            box-sizing: border-box;
+        body { 
+            margin: 0; 
+            font-family: Arial, sans-serif;
+            padding: 20px;
         }
-        .info p { margin: 0; padding: 5px 0; }
+        .info {
+            border: 1px solid #4CAF50;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
         #debug-console {
-            background: #f0f0f0;
-            padding: 10px;
-            margin: 10px;
+            background: #f5f5f5;
+            padding: 15px;
             border-radius: 5px;
             font-family: monospace;
+            margin-top: 20px;
             white-space: pre-wrap;
         }
+        .error { color: red; }
+        .success { color: green; }
     </style>
-    <!-- Import Firebase et CryptoJS -->
+</head>
+<body>
+    <div id="app">
+        <h1 style="color: #4CAF50; text-align: center;">Vérification d'attestation</h1>
+        
+        <div class="info">
+            <p><strong>Matricule :</strong> <span id="matricule">-</span></p>
+            <p><strong>N° attestation :</strong> <span id="num_attest">-</span></p>
+            <p><strong>Nom :</strong> <span id="nom">-</span></p>
+            <p><strong>Prénom :</strong> <span id="prenom">-</span></p>
+            <p><strong>Date de naissance :</strong> <span id="date_naissance">-</span></p>
+            <p><strong>Date mise à jour :</strong> <span id="date_maj">-</span></p>
+            <p><strong>Date d'annulation :</strong> <span id="date_annulation" class="error">-</span></p>
+        </div>
+
+        <div id="debug-console">[SYSTÈME] Initialisation en cours...</div>
+    </div>
+
+    <!-- Librairies Firebase et CryptoJS -->
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-</head>
-<body>
-    <div style="padding:5px">
-        <img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/" alt="Logo" width=100% height=170px>
-        <div style="font-weight:600; text-align:center; margin-bottom:10px; color:#4caf50; margin-top:16px">
-            <div style="font-size:18px; margin-bottom:8px">Attestation authentique</div>
-            <div style="color:#f77a7a">Veuillez vérifier les informations personnelles</div>
-        </div>
-        <div class="info">
-            <p><strong>Matricule :</strong> <span id="matricule">Chargement...</span></p>
-            <p><strong>N° attestation :</strong> <span id="num_attest">Chargement...</span></p>
-            <p><strong>Nom :</strong> <span id="nom">Chargement...</span></p>
-            <p><strong>Prénom :</strong> <span id="prenom">Chargement...</span></p>
-            <p><strong>Date de naissance :</strong> <span id="date_naissance">Chargement...</span></p>
-            <p><strong>Date mise à jour :</strong> <span id="date_maj">Chargement...</span></p>
-            <p><strong>Date d'annulation :</strong> <span id="date_annulation">Chargement...</span></p>
-        </div>
-        <div id="debug-console">[DEBUG] Initialisation...</div>
-    </div>
 
     <script>
-        // Config Firebase (remplace avec tes infos si besoin)
+        // Configuration Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyA4fkmfRxjuNEXWbOMOlBsIq2N6lZnd4ps",
             authDomain: "verif-clients-f5915.firebaseapp.com",
@@ -65,86 +63,83 @@
             appId: "1:914666601909:web:286ad5057da0ac0ea46dfc"
         };
 
-        // Initialisation Firebase
+        // Initialisation
         const app = firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.database();
-        const debugConsole = document.getElementById('debug-console');
+        const debug = document.getElementById('debug-console');
 
-        // Fonction pour logger les étapes
-        function logDebug(message) {
-            debugConsole.textContent += `\n[${new Date().toLocaleTimeString()}] ${message}`;
-            console.log(message);
+        // Fonction de logging améliorée
+        function log(message, type = 'info') {
+            const prefix = `[${new Date().toLocaleTimeString()}]`;
+            const color = type === 'error' ? 'red' : type === 'success' ? 'green' : 'black';
+            debug.innerHTML += `<div style="color:${color}">${prefix} ${message}</div>`;
+            console[type === 'error' ? 'error' : 'log'](message);
         }
 
-        // 1. Connexion anonyme
-        logDebug("Tentative de connexion anonyme Firebase...");
-        signInAnonymously(auth)
-            .then(() => {
-                logDebug("✅ Connecté anonymement. UID: " + auth.currentUser.uid);
-                
-                // 2. Récupération de la clé AES depuis Firebase
-                logDebug("Récupération de la clé AES...");
-                const keyRef = db.ref('config/cleAES');
-                keyRef.once('value').then((snapshot) => {
-                    const cleAES = snapshot.val();
-                    logDebug("✅ Clé AES récupérée: " + cleAES.replace(/./g, '*')); // Masquée pour la sécurité
-
-                    // 3. Décodage des données de l'URL
-                    decoderInfos(cleAES);
-                }).catch((error) => {
-                    logDebug("❌ Erreur accès clé AES: " + error.message);
-                });
-            })
-            .catch((error) => {
-                logDebug("❌ Erreur connexion anonyme: " + error.message);
-            });
-
-        // Fonction pour décoder les données (avec AES)
-        function decoderInfos(cleAES) {
-            const params = new URLSearchParams(window.location.search);
-            const data = params.get("data");
-
-            if (!data) {
-                logDebug("❌ Aucun paramètre 'data' dans l'URL");
-                return;
-            }
-
-            logDebug("Déchiffrement des données...");
+        // Processus principal
+        async function initApp() {
             try {
-                // Décodage Base64 -> AES -> Données claires
-                const bytes = CryptoJS.AES.decrypt(data, cleAES);
-                const decoded = bytes.toString(CryptoJS.enc.Utf8);
+                log("Connexion anonyme à Firebase...");
+                await auth.signInAnonymously();
+                log(`✅ Connecté (UID: ${auth.currentUser.uid.substring(0, 8)}...)`, 'success');
+
+                log("Analyse de l'URL...");
+                const params = new URLSearchParams(window.location.search);
+                const encryptedData = params.get('data');
+                const matricule = params.get('matricule');
+
+                if (!encryptedData || !matricule) {
+                    throw new Error("Paramètres manquants dans l'URL (data et matricule requis)");
+                }
+
+                log("Vérification blacklist...");
+                const blacklistSnapshot = await db.ref('blacklist/' + matricule).once('value');
+                if (blacklistSnapshot.exists()) {
+                    throw new Error(`Matricule ${matricule} est blacklisté`);
+                }
+
+                log("Récupération de la clé AES...");
+                const keySnapshot = await db.ref('config/cleAES').once('value');
+                const cleAES = keySnapshot.val();
+
+                log("Déchiffrement des données...");
+                const bytes = CryptoJS.AES.decrypt(encryptedData, cleAES);
+                const decrypted = bytes.toString(CryptoJS.enc.Utf8);
                 
-                if (!decoded) {
-                    logDebug("❌ Clé AES invalide ou données corrompues");
-                    return;
+                if (!decrypted) {
+                    throw new Error("Échec du déchiffrement (clé ou données invalides)");
                 }
 
-                logDebug("✅ Données déchiffrées: " + decoded);
-                const [matricule, num_attest, nom, prenom, date_naissance, date_maj, date_annulation] = decoded.split("|");
+                log(`✅ Données décryptées: ${decrypted}`, 'success');
+                displayData(decrypted.split('|'));
 
-                // Vérification blacklist (exemple)
-                const isBlacklisted = matricule === "123456"; // À remplacer par une vraie vérification Firebase
-                if (isBlacklisted) {
-                    logDebug("❌ Matricule blacklisté !");
-                    alert("Accès refusé : matricule blacklisté.");
-                    return;
-                }
-
-                // Affichage des données
-                document.getElementById("matricule").textContent = matricule || "Non défini";
-                document.getElementById("num_attest").textContent = num_attest || "Non défini";
-                document.getElementById("nom").textContent = nom || "Non défini";
-                document.getElementById("prenom").textContent = prenom || "Non défini";
-                document.getElementById("date_naissance").textContent = date_naissance || "Non défini";
-                document.getElementById("date_maj").textContent = date_maj || "Non défini";
-                document.getElementById("date_annulation").textContent = date_annulation || "Non défini";
-
-            } catch (e) {
-                logDebug("❌ Erreur déchiffrement: " + e.message);
+            } catch (error) {
+                log(`❌ ERREUR: ${error.message}`, 'error');
+                document.getElementById('debug-console').classList.add('error');
             }
         }
+
+        // Affichage des données
+        function displayData(data) {
+            const fields = [
+                'matricule', 'num_attest', 'nom', 'prenom', 
+                'date_naissance', 'date_maj', 'date_annulation'
+            ];
+            
+            fields.forEach((field, index) => {
+                const element = document.getElementById(field);
+                if (element) {
+                    element.textContent = data[index] || 'Non fourni';
+                    if (field === 'date_annulation' && data[index]) {
+                        element.classList.add('error');
+                    }
+                }
+            });
+        }
+
+        // Lancement de l'application
+        initApp();
     </script>
 </body>
 </html>

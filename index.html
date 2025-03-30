@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vérification</title>
-    <!-- VOS STYLE EXISTANTS (inchangés) -->
     <style>
         body{margin:0!important}
         #date_annulation {
@@ -25,7 +24,7 @@
             margin: 0;
             padding: 5px 0;
         }
-        /* Debug minimaliste (à supprimer après) */
+        /* Debug minimaliste */
         #casnos-debug {
             position: fixed;
             bottom: 10px;
@@ -39,12 +38,25 @@
             max-height: 150px;
             overflow: auto;
             z-index: 9999;
+            display: none; /* Masqué par défaut */
+        }
+        #toggle-debug {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            z-index: 10000;
         }
     </style>
     <link rel="icon" href="data:,">
 </head>
 <body>
-    <!-- VOTRE PAGE EXISTANTE (inchangée) -->
+    <!-- VOTRE PAGE EXISTANTE -->
     <div style="padding:5px">
         <img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/" alt="Logo CASNOS" width=100% height=170px>
         <div style="font-weight:600;text-align:center;margin-bottom:10px;color:#4caf50;margin-top:16px">
@@ -62,84 +74,97 @@
         </div>
     </div>
 
-    <!-- Debug discret (supprimable) -->
+    <!-- Debug (masqué par défaut) -->
+    <button id="toggle-debug">Debug</button>
     <div id="casnos-debug"></div>
 
-    <!-- Scripts (à la fin du body) -->
+    <!-- Import Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+
     <script>
-        // Debug minimal
+        // Gestion du debug
+        document.getElementById('toggle-debug').addEventListener('click', function() {
+            const debugEl = document.getElementById('casnos-debug');
+            debugEl.style.display = debugEl.style.display === 'block' ? 'none' : 'block';
+        });
+
         function debug(msg) {
             const debugEl = document.getElementById('casnos-debug');
             debugEl.innerHTML += `<div>${new Date().toLocaleTimeString()}: ${msg}</div>`;
             console.log(msg);
+            debugEl.scrollTop = debugEl.scrollHeight;
         }
 
-        // Votre clé AES (récupérée depuis Firebase)
+        // Initialisation Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyA4fkmfRxjuNEXWbOMOlBsIq2N6lZnd4ps",
+            authDomain: "verif-clients-f5915.firebaseapp.com",
+            databaseURL: "https://verif-clients-f5915-default-rtdb.firebaseio.com",
+            projectId: "verif-clients-f5915",
+            storageBucket: "verif-clients-f5915.appspot.com",
+            messagingSenderId: "914666601909",
+            appId: "1:914666601909:web:286ad5057da0ac0ea46dfc"
+        };
+
+        // Récupération clé AES
         async function getAESKey() {
             try {
-                // Configuration Firebase (à remplir)
-                const firebaseConfig = {
-                    apiKey: "AIzaSyA4fkmfRxjuNEXWbOMOlBsIq2N6lZnd4ps",
-                    databaseURL: "https://verif-clients-f5915-default-rtdb.firebaseio.com"
-                };
-                
-                // Initialisation Firebase
-                firebase.initializeApp(firebaseConfig);
-                const db = firebase.database();
-                
-                // Récupération clé
-                const snapshot = await db.ref('config/cleAES').once('value');
+                if (!firebase.apps.length) {
+                    firebase.initializeApp(firebaseConfig);
+                }
+                const snapshot = await firebase.database().ref('config/cleAES').once('value');
                 return snapshot.val();
             } catch (e) {
-                debug("Erreur récupération clé: " + e.message);
-                return "vGX8!jkd72p$"; // Fallback si Firebase échoue
+                debug("Erreur Firebase, utilisation clé par défaut");
+                return "vGX8!jkd72p$"; // Votre clé en fallback
             }
         }
 
-        // Déchiffrement adaptatif
+        // Déchiffrement robuste
         async function decryptData() {
             const params = new URLSearchParams(window.location.search);
             const encrypted = params.get("data");
             
             if (!encrypted) {
-                debug("Aucun paramètre 'data' trouvé");
+                debug("Aucun paramètre 'data' dans l'URL");
                 return;
             }
 
             try {
                 const cleAES = await getAESKey();
-                debug("Clé AES utilisée: " + cleAES.replace(/./g, '*'));
-                
-                // Essai 1: Méthode standard
+                debug(`Clé AES utilisée: ${cleAES.replace(/./g, '*')}`);
+
+                // Méthode 1: Standard
                 let bytes = CryptoJS.AES.decrypt(encrypted, cleAES);
                 let decrypted = bytes.toString(CryptoJS.enc.Utf8);
-                
-                // Essai 2: Si échec, méthode alternative
+
+                // Méthode 2: Alternative si échec
                 if (!decrypted) {
                     debug("Tentative méthode alternative...");
                     bytes = CryptoJS.AES.decrypt(
-                        { ciphertext: CryptoJS.enc.Base64.parse(encrypted) },
+                        { ciphertext: CryptoJS.enc.Base64.parse(decodeURIComponent(encrypted)) },
                         CryptoJS.enc.Utf8.parse(cleAES),
-                        { mode: CryptoJS.mode.ECB, padding: CryptoJS.pad.Pkcs7 }
+                        { mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }
                     );
                     decrypted = bytes.toString(CryptoJS.enc.Utf8);
                 }
-                
-                if (!decrypted) throw new Error("Échec des deux méthodes");
-                
-                // Affichage des données
+
+                if (!decrypted) throw new Error("Les deux méthodes ont échoué");
+
+                // Affichage
                 const data = decrypted.split("|");
-                const fields = ["matricule", "num_attest", "nom", "prenom", "date_naissance", "date_maj", "date_annulation"];
-                fields.forEach((field, i) => {
-                    document.getElementById(field).textContent = data[i] || "";
+                const ids = ["matricule", "num_attest", "nom", "prenom", "date_naissance", "date_maj", "date_annulation"];
+                ids.forEach((id, i) => {
+                    document.getElementById(id).textContent = data[i] || "";
                 });
-                
-                debug("Déchiffrement réussi !");
-                
+
+                debug("Déchiffrement réussi!");
+
             } catch (e) {
-                debug("ERREUR Déchiffrement: " + e.message);
-                document.getElementById("date_annulation").textContent = "Erreur: données invalides";
+                debug(`ERREUR: ${e.message}`);
+                document.getElementById("date_annulation").textContent = "Erreur de vérification";
             }
         }
 

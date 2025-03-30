@@ -5,10 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vérification</title>
     <style>
-        body{margin:0!important}
-        #date_annulation {
-            color: red;
-        }
+        body { margin: 0 !important; font-family: Arial, sans-serif; }
+        #date_annulation { color: red; }
         .info {
             width: 100%;
             display: flex;
@@ -20,10 +18,7 @@
             padding: 5px 10px;
             box-sizing: border-box;
         }
-        .info p {
-            margin: 0;
-            padding: 5px 0;
-        }
+        .info p { margin: 0; padding: 5px 0; }
         /* Debug panel */
         #debug-panel {
             position: fixed;
@@ -68,65 +63,68 @@
     <!-- CryptoJS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     
-    <!-- Firebase Modular v9 -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-auth.js";
-        import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-database.js";
-
-        // Configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyA4fkmfRxjuNEXWbOMOlBsIq2N6lZnd4ps",
-            authDomain: "verif-clients-f5915.firebaseapp.com",
-            databaseURL: "https://verif-clients-f5915-default-rtdb.firebaseio.com",
-            projectId: "verif-clients-f5915",
-            storageBucket: "verif-clients-f5915.appspot.com",
-            messagingSenderId: "914666601909",
-            appId: "1:914666601909:web:286ad5057da0ac0ea46dfc"
-        };
-
-        // Debug system
+    <script>
+        // Système de debug
         function debugLog(message, type = 'info') {
             const logElement = document.getElementById('debug-logs');
             const entry = document.createElement('div');
             entry.className = `debug-${type}`;
             entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
             logElement.appendChild(entry);
-            console.log(`[${type}] ${message}`);
+            console[type === 'error' ? 'error' : 'log'](message);
         }
 
-        // Main process
+        // Fonction pour tester le déchiffrement
+        async function testDecryption(encryptedData, cleAES) {
+            debugLog("Test de déchiffrement en cours...");
+            
+            try {
+                // Méthode 1 - Standard
+                const bytes1 = CryptoJS.AES.decrypt(encryptedData, cleAES);
+                const decrypted1 = bytes1.toString(CryptoJS.enc.Utf8);
+                if (decrypted1) {
+                    debugLog("Méthode standard réussie", "success");
+                    return decrypted1;
+                }
+            } catch (e) {
+                debugLog("Méthode standard échouée: " + e.message);
+            }
+
+            try {
+                // Méthode 2 - Alternative
+                const bytes2 = CryptoJS.AES.decrypt(
+                    { ciphertext: CryptoJS.enc.Base64.parse(encryptedData) },
+                    CryptoJS.enc.Utf8.parse(cleAES),
+                    { mode: CryptoJS.mode.ECB, padding: CryptoJS.pad.Pkcs7 }
+                );
+                const decrypted2 = bytes2.toString(CryptoJS.enc.Utf8);
+                if (decrypted2) {
+                    debugLog("Méthode alternative réussie", "success");
+                    return decrypted2;
+                }
+            } catch (e) {
+                debugLog("Méthode alternative échouée: " + e.message);
+            }
+
+            throw new Error("Toutes les méthodes de déchiffrement ont échoué");
+        }
+
+        // Processus principal
         async function main() {
             try {
-                debugLog("Initialisation Firebase...");
-                const app = initializeApp(firebaseConfig);
-                const auth = getAuth(app);
-                const db = getDatabase(app);
-
-                debugLog("Connexion anonyme...");
-                await signInAnonymously(auth);
+                debugLog("Démarrage du processus...");
                 
                 const params = new URLSearchParams(window.location.search);
                 const encryptedData = params.get('data');
                 
                 if (!encryptedData) throw new Error("Paramètre 'data' manquant");
                 
-                debugLog("Récupération clé AES...");
-                const keySnapshot = await get(ref(db, 'config/cleAES'));
-                const cleAES = keySnapshot.val();
+                // Clé AES codée en dur pour le test
+                const cleAES = "vGX8!jkd72p$";
+                debugLog("Utilisation de la clé AES: " + cleAES.replace(/./g, '*'));
                 
-                if (!cleAES) throw new Error("Clé AES non trouvée");
-                debugLog("Clé AES récupérée", "success");
-                
-                debugLog("Déchiffrement...");
-                // IMPORTANT: Méthode corrigée pour le déchiffrement
-                const decryptedBytes = CryptoJS.AES.decrypt(
-                    { ciphertext: CryptoJS.enc.Base64.parse(encryptedData) },
-                    CryptoJS.enc.Utf8.parse(cleAES),
-                    { mode: CryptoJS.mode.ECB }
-                );
-                
-                const decrypted = decryptedBytes.toString(CryptoJS.enc.Utf8);
+                // Test de déchiffrement
+                const decrypted = await testDecryption(encryptedData, cleAES);
                 
                 if (!decrypted) throw new Error("Échec du déchiffrement");
                 debugLog("Données déchiffrées: " + decrypted, "success");
@@ -149,7 +147,7 @@
             }
         }
 
-        // Start
+        // Démarrer
         main();
     </script>
 </body>

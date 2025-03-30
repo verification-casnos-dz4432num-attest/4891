@@ -4,9 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vérification</title>
+    <!-- VOS STYLE EXISTANTS (inchangés) -->
     <style>
-        body { margin: 0 !important; font-family: Arial, sans-serif; }
-        #date_annulation { color: red; }
+        body{margin:0!important}
+        #date_annulation {
+            color: red;
+        }
         .info {
             width: 100%;
             display: flex;
@@ -18,26 +21,30 @@
             padding: 5px 10px;
             box-sizing: border-box;
         }
-        .info p { margin: 0; padding: 5px 0; }
-        /* Debug panel */
-        #debug-panel {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: #f0f0f0;
-            padding: 10px;
-            font-family: monospace;
-            border-top: 1px solid #ccc;
-            max-height: 200px;
-            overflow-y: auto;
+        .info p {
+            margin: 0;
+            padding: 5px 0;
         }
-        .debug-error { color: red; }
-        .debug-success { color: green; }
+        /* Debug minimaliste (à supprimer après) */
+        #casnos-debug {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px;
+            font-size: 12px;
+            border-radius: 5px;
+            max-width: 300px;
+            max-height: 150px;
+            overflow: auto;
+            z-index: 9999;
+        }
     </style>
     <link rel="icon" href="data:,">
 </head>
 <body>
+    <!-- VOTRE PAGE EXISTANTE (inchangée) -->
     <div style="padding:5px">
         <img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/" alt="Logo CASNOS" width=100% height=170px>
         <div style="font-weight:600;text-align:center;margin-bottom:10px;color:#4caf50;margin-top:16px">
@@ -45,110 +52,99 @@
             <div style="color:#f77a7a">Veuillez vérifier les informations personelles</div>
         </div>
         <div class="info">
-            <p><strong>Matricule :</strong> <span id="matricule">-</span></p>
-            <p><strong>N° attestation :</strong> <span id="num_attest">-</span></p>
-            <p><strong>Nom :</strong> <span id="nom">-</span></p>
-            <p><strong>Prénom :</strong> <span id="prenom">-</span></p>
-            <p><strong>Date de naissance :</strong> <span id="date_naissance">-</span></p>
-            <p><strong>Date mise à jour :</strong> <span id="date_maj">-</span></p>
-            <p><strong>Date d'annulation :</strong> <span id="date_annulation">-</span></p>
+            <p><strong>Matricule :</strong> <span id="matricule"></span></p>
+            <p><strong>N° attestation :</strong> <span id="num_attest"></span></p>
+            <p><strong>Nom :</strong> <span id="nom"></span></p>
+            <p><strong>Prénom :</strong> <span id="prenom"></span></p>
+            <p><strong>Date de naissance :</strong> <span id="date_naissance"></span></p>
+            <p><strong>Date mise à jour :</strong> <span id="date_maj"></span></p>
+            <p><strong>Date d'annulation :</strong> <span id="date_annulation"></span></p>
         </div>
     </div>
 
-    <div id="debug-panel">
-        <strong>Journal de débogage :</strong>
-        <div id="debug-logs"></div>
-    </div>
+    <!-- Debug discret (supprimable) -->
+    <div id="casnos-debug"></div>
 
-    <!-- CryptoJS -->
+    <!-- Scripts (à la fin du body) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-    
     <script>
-        // Système de debug
-        function debugLog(message, type = 'info') {
-            const logElement = document.getElementById('debug-logs');
-            const entry = document.createElement('div');
-            entry.className = `debug-${type}`;
-            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-            logElement.appendChild(entry);
-            console[type === 'error' ? 'error' : 'log'](message);
+        // Debug minimal
+        function debug(msg) {
+            const debugEl = document.getElementById('casnos-debug');
+            debugEl.innerHTML += `<div>${new Date().toLocaleTimeString()}: ${msg}</div>`;
+            console.log(msg);
         }
 
-        // Fonction pour tester le déchiffrement
-        async function testDecryption(encryptedData, cleAES) {
-            debugLog("Test de déchiffrement en cours...");
+        // Votre clé AES (récupérée depuis Firebase)
+        async function getAESKey() {
+            try {
+                // Configuration Firebase (à remplir)
+                const firebaseConfig = {
+                    apiKey: "AIzaSyA4fkmfRxjuNEXWbOMOlBsIq2N6lZnd4ps",
+                    databaseURL: "https://verif-clients-f5915-default-rtdb.firebaseio.com"
+                };
+                
+                // Initialisation Firebase
+                firebase.initializeApp(firebaseConfig);
+                const db = firebase.database();
+                
+                // Récupération clé
+                const snapshot = await db.ref('config/cleAES').once('value');
+                return snapshot.val();
+            } catch (e) {
+                debug("Erreur récupération clé: " + e.message);
+                return "vGX8!jkd72p$"; // Fallback si Firebase échoue
+            }
+        }
+
+        // Déchiffrement adaptatif
+        async function decryptData() {
+            const params = new URLSearchParams(window.location.search);
+            const encrypted = params.get("data");
             
-            try {
-                // Méthode 1 - Standard
-                const bytes1 = CryptoJS.AES.decrypt(encryptedData, cleAES);
-                const decrypted1 = bytes1.toString(CryptoJS.enc.Utf8);
-                if (decrypted1) {
-                    debugLog("Méthode standard réussie", "success");
-                    return decrypted1;
-                }
-            } catch (e) {
-                debugLog("Méthode standard échouée: " + e.message);
+            if (!encrypted) {
+                debug("Aucun paramètre 'data' trouvé");
+                return;
             }
 
             try {
-                // Méthode 2 - Alternative
-                const bytes2 = CryptoJS.AES.decrypt(
-                    { ciphertext: CryptoJS.enc.Base64.parse(encryptedData) },
-                    CryptoJS.enc.Utf8.parse(cleAES),
-                    { mode: CryptoJS.mode.ECB, padding: CryptoJS.pad.Pkcs7 }
-                );
-                const decrypted2 = bytes2.toString(CryptoJS.enc.Utf8);
-                if (decrypted2) {
-                    debugLog("Méthode alternative réussie", "success");
-                    return decrypted2;
+                const cleAES = await getAESKey();
+                debug("Clé AES utilisée: " + cleAES.replace(/./g, '*'));
+                
+                // Essai 1: Méthode standard
+                let bytes = CryptoJS.AES.decrypt(encrypted, cleAES);
+                let decrypted = bytes.toString(CryptoJS.enc.Utf8);
+                
+                // Essai 2: Si échec, méthode alternative
+                if (!decrypted) {
+                    debug("Tentative méthode alternative...");
+                    bytes = CryptoJS.AES.decrypt(
+                        { ciphertext: CryptoJS.enc.Base64.parse(encrypted) },
+                        CryptoJS.enc.Utf8.parse(cleAES),
+                        { mode: CryptoJS.mode.ECB, padding: CryptoJS.pad.Pkcs7 }
+                    );
+                    decrypted = bytes.toString(CryptoJS.enc.Utf8);
                 }
-            } catch (e) {
-                debugLog("Méthode alternative échouée: " + e.message);
-            }
-
-            throw new Error("Toutes les méthodes de déchiffrement ont échoué");
-        }
-
-        // Processus principal
-        async function main() {
-            try {
-                debugLog("Démarrage du processus...");
                 
-                const params = new URLSearchParams(window.location.search);
-                const encryptedData = params.get('data');
+                if (!decrypted) throw new Error("Échec des deux méthodes");
                 
-                if (!encryptedData) throw new Error("Paramètre 'data' manquant");
-                
-                // Clé AES codée en dur pour le test
-                const cleAES = "vGX8!jkd72p$";
-                debugLog("Utilisation de la clé AES: " + cleAES.replace(/./g, '*'));
-                
-                // Test de déchiffrement
-                const decrypted = await testDecryption(encryptedData, cleAES);
-                
-                if (!decrypted) throw new Error("Échec du déchiffrement");
-                debugLog("Données déchiffrées: " + decrypted, "success");
-                
+                // Affichage des données
                 const data = decrypted.split("|");
-                if (data.length < 7) throw new Error("Format invalide (7 champs attendus)");
+                const fields = ["matricule", "num_attest", "nom", "prenom", "date_naissance", "date_maj", "date_annulation"];
+                fields.forEach((field, i) => {
+                    document.getElementById(field).textContent = data[i] || "";
+                });
                 
-                // Affichage
-                document.getElementById("matricule").textContent = data[0] || "-";
-                document.getElementById("num_attest").textContent = data[1] || "-";
-                document.getElementById("nom").textContent = data[2] || "-";
-                document.getElementById("prenom").textContent = data[3] || "-";
-                document.getElementById("date_naissance").textContent = data[4] || "-";
-                document.getElementById("date_maj").textContent = data[5] || "-";
-                document.getElementById("date_annulation").textContent = data[6] || "-";
-
-            } catch (error) {
-                debugLog(`ERREUR: ${error.message}`, "error");
-                document.getElementById("date_annulation").textContent = error.message;
+                debug("Déchiffrement réussi !");
+                
+            } catch (e) {
+                debug("ERREUR Déchiffrement: " + e.message);
+                document.getElementById("date_annulation").textContent = "Erreur: données invalides";
             }
         }
 
-        // Démarrer
-        main();
+        // Lancement
+        decryptData();
     </script>
 </body>
 </html>

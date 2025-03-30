@@ -24,22 +24,21 @@
             margin: 0;
             padding: 5px 0;
         }
-        /* Styles debug */
-        #debug-container {
+        /* Debug panel */
+        #debug-panel {
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
-            background: #f5f5f5;
-            border-top: 2px solid #4CAF50;
+            background: #f0f0f0;
             padding: 10px;
             font-family: monospace;
+            border-top: 1px solid #ccc;
             max-height: 200px;
             overflow-y: auto;
-            z-index: 1000;
         }
-        .debug-error { color: #f44336; }
-        .debug-success { color: #4CAF50; }
+        .debug-error { color: red; }
+        .debug-success { color: green; }
     </style>
     <link rel="icon" href="data:,">
 </head>
@@ -61,17 +60,21 @@
         </div>
     </div>
 
-    <div id="debug-container">
-        <div><strong>Journal de débogage :</strong></div>
-        <div id="debug-output"></div>
+    <div id="debug-panel">
+        <strong>Journal de débogage :</strong>
+        <div id="debug-logs"></div>
     </div>
 
+    <!-- CryptoJS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    
+    <!-- Firebase Modular v9 -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-auth.js";
         import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-database.js";
 
+        // Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyA4fkmfRxjuNEXWbOMOlBsIq2N6lZnd4ps",
             authDomain: "verif-clients-f5915.firebaseapp.com",
@@ -82,16 +85,18 @@
             appId: "1:914666601909:web:286ad5057da0ac0ea46dfc"
         };
 
+        // Debug system
         function debugLog(message, type = 'info') {
-            const debugOutput = document.getElementById('debug-output');
+            const logElement = document.getElementById('debug-logs');
             const entry = document.createElement('div');
-            entry.className = type === 'error' ? 'debug-error' : 'debug-success';
+            entry.className = `debug-${type}`;
             entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-            debugOutput.appendChild(entry);
-            console[type === 'error' ? 'error' : 'log'](message);
+            logElement.appendChild(entry);
+            console.log(`[${type}] ${message}`);
         }
 
-        async function processData() {
+        // Main process
+        async function main() {
             try {
                 debugLog("Initialisation Firebase...");
                 const app = initializeApp(firebaseConfig);
@@ -109,29 +114,34 @@
                 debugLog("Récupération clé AES...");
                 const keySnapshot = await get(ref(db, 'config/cleAES'));
                 const cleAES = keySnapshot.val();
-                debugLog(`Clé récupérée: ${cleAES ? '*****' : 'NON TROUVÉE'}`);
                 
-                if (!cleAES) throw new Error("Clé AES non configurée");
+                if (!cleAES) throw new Error("Clé AES non trouvée");
+                debugLog("Clé AES récupérée", "success");
                 
-                debugLog("Déchiffrement en cours...");
-                // CORRECTION IMPORTANTE : Utilisation de decodeURIComponent
-                const decodedData = decodeURIComponent(encryptedData);
-                const bytes = CryptoJS.AES.decrypt(decodedData, cleAES);
-                const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+                debugLog("Déchiffrement...");
+                // IMPORTANT: Méthode corrigée pour le déchiffrement
+                const decryptedBytes = CryptoJS.AES.decrypt(
+                    { ciphertext: CryptoJS.enc.Base64.parse(encryptedData) },
+                    CryptoJS.enc.Utf8.parse(cleAES),
+                    { mode: CryptoJS.mode.ECB }
+                );
                 
-                if (!decrypted) throw new Error("Échec du déchiffrement - Format de clé ou données incorrect");
+                const decrypted = decryptedBytes.toString(CryptoJS.enc.Utf8);
                 
-                debugLog("Données déchiffrées:", "success");
-                debugLog(decrypted, "success");
+                if (!decrypted) throw new Error("Échec du déchiffrement");
+                debugLog("Données déchiffrées: " + decrypted, "success");
                 
                 const data = decrypted.split("|");
-                if (data.length < 7) throw new Error("Format de données invalide");
+                if (data.length < 7) throw new Error("Format invalide (7 champs attendus)");
                 
                 // Affichage
-                const fields = ['matricule', 'num_attest', 'nom', 'prenom', 'date_naissance', 'date_maj', 'date_annulation'];
-                fields.forEach((field, i) => {
-                    document.getElementById(field).textContent = data[i] || "-";
-                });
+                document.getElementById("matricule").textContent = data[0] || "-";
+                document.getElementById("num_attest").textContent = data[1] || "-";
+                document.getElementById("nom").textContent = data[2] || "-";
+                document.getElementById("prenom").textContent = data[3] || "-";
+                document.getElementById("date_naissance").textContent = data[4] || "-";
+                document.getElementById("date_maj").textContent = data[5] || "-";
+                document.getElementById("date_annulation").textContent = data[6] || "-";
 
             } catch (error) {
                 debugLog(`ERREUR: ${error.message}`, "error");
@@ -139,8 +149,8 @@
             }
         }
 
-        // Lancement
-        processData();
+        // Start
+        main();
     </script>
 </body>
 </html>

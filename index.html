@@ -4,12 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vérification</title>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <style>
         body{margin:0!important}
-        #date_annulation { color: red; }
+        #date_annulation {
+            color: red;
+        }
         .info {
             width: 100%;
             display: flex;
@@ -21,69 +20,85 @@
             padding: 5px 10px;
             box-sizing: border-box;
         }
-        .info p { margin: 0; padding: 5px 0; }
+        .info p {
+            margin: 0;
+            padding: 5px 0;
+        }
     </style>
 </head>
 <body>
-    <div class="info">
-        <p><strong>Matricule :</strong> <span id="matricule"></span></p>
-        <p><strong>N° attestation :</strong> <span id="num_attest"></span></p>
-        <p><strong>Nom :</strong> <span id="nom"></span></p>
-        <p><strong>Prénom :</strong> <span id="prenom"></span></p>
-        <p><strong>Date de naissance :</strong> <span id="date_naissance"></span></p>
-        <p><strong>Date mise à jour :</strong> <span id="date_maj"></span></p>
-        <p><strong>Date d'annulation :</strong> <span id="date_annulation"></span></p>
-    </div>
+    <app-root _nghost-sst-c43 ng-version="13.0.3">
+        <div _ngcontent-sst-c43 style="padding:5px" class="ng-star-inserted">
+            <div _ngcontent-sst-c43>
+                <img _ngcontent-sst-c43 src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/" alt="Logo CASNOS" width=100% height=170px>
+                <div _ngcontent-sst-c43>
+                    <div _ngcontent-sst-c43 style=font-weight:600;text-align:center;margin-bottom:10px;color:#4caf50;margin-top:16px class=ng-star-inserted>
+                        <div _ngcontent-sst-c43 style=font-size:18px;margin-bottom:8px>Attestation authentique</div>
+                        <div _ngcontent-sst-c43 style=color:#f77a7a>Veuillez vérifier les informations personelles</div>
+                    </div>
+                </div>
+                <div _ngcontent-sst-c43 class="info">
+                    <p><strong>Matricule :</strong> <span id="matricule"></span></p>
+                    <p><strong>N° attestation :</strong> <span id="num_attest"></span></p>
+                    <p><strong>Nom :</strong> <span id="nom"></span></p>
+                    <p><strong>Prénom :</strong> <span id="prenom"></span></p>
+                    <p><strong>Date de naissance :</strong> <span id="date_naissance"></span></p>
+                    <p><strong>Date mise à jour :</strong> <span id="date_maj"></span></p>
+                    <p><strong>Date d'annulation :</strong> <span id="date_annulation"></span></p>
+                </div>
+            </div>
+        </div>
+    </app-root>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script>
-        const firebaseConfig = {
-            databaseURL: "https://verif-clients-f5915-default-rtdb.firebaseio.com/"
-        };
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
+        const AES_KEY = "vGX8!jkd72p$";
+        const BLACKLIST = ["99999", "88888"];
 
-        async function getAESKey() {
-            const snapshot = await db.ref("config/cleAES").get();
-            return snapshot.exists() ? snapshot.val() : null;
+        function afficherErreur(message) {
+            document.body.innerHTML = '<h2 style="color:red;text-align:center;">' + message + '</h2>';
         }
 
-        async function isBlacklisted(clientId) {
-            const snapshot = await db.ref(`blacklist/${clientId}`).get();
-            return snapshot.exists();
-        }
-
-        async function verifierClient() {
+        function verifierClient() {
             const params = new URLSearchParams(window.location.search);
             const id = params.get("id");
-            const token = params.get("token");
-
+            let token = params.get("token");
+            
+            console.log("[DEBUG 1] ID reçu :", id);
+            console.log("[DEBUG 2] Token brut reçu :", token);
+            
             if (!id || !token) {
-                document.body.innerHTML = '<h2 style="color:red;text-align:center;">Lien invalide</h2>';
+                afficherErreur("Lien invalide (paramètres manquants)");
                 return;
             }
 
-            if (await isBlacklisted(id)) {
-                document.body.innerHTML = '<h2 style="color:red;text-align:center;">Client non validé (Blacklisté)</h2>';
-                return;
-            }
-
-            const aesKey = await getAESKey();
-            if (!aesKey) {
-                document.body.innerHTML = '<h2 style="color:red;text-align:center;">Erreur de configuration</h2>';
+            if (BLACKLIST.includes(id)) {
+                afficherErreur("Client non validé (BlackList)");
                 return;
             }
 
             try {
-                const bytes = CryptoJS.AES.decrypt(token, aesKey);
+                token = decodeURIComponent(token);
+                console.log("[DEBUG 3] Token après decodeURIComponent :", token);
+
+                const bytes = CryptoJS.AES.decrypt(token, AES_KEY);
                 const decryptedData = bytes.toString(CryptoJS.enc.Utf8);
+                console.log("[DEBUG 4] Token déchiffré :", decryptedData);
+
                 const dataParts = decryptedData.split("|");
+                console.log("[DEBUG 5] Données extraites :", dataParts);
 
                 if (dataParts[0] !== id) {
-                    document.body.innerHTML = '<h2 style="color:red;text-align:center;">Client non validé</h2>';
+                    console.log("[DEBUG 6] Comparaison ID :", dataParts[0], "!==", id, "(invalide ❌)");
+                    afficherErreur("Client non validé (mauvais token)");
                     return;
                 }
 
+                console.log("[DEBUG 6] Comparaison ID :", dataParts[0], "===", id, "(valide ✅)");
+                console.log("[DEBUG 7] Injection des données dans la page...");
+
                 const [matricule, num_attest, nom, prenom, date_naissance, date_maj, date_annulation] = dataParts;
+
                 document.getElementById("matricule").textContent = matricule || "Non défini";
                 document.getElementById("num_attest").textContent = num_attest || "Non défini";
                 document.getElementById("nom").textContent = nom || "Non défini";
@@ -91,8 +106,10 @@
                 document.getElementById("date_naissance").textContent = date_naissance || "Non défini";
                 document.getElementById("date_maj").textContent = date_maj || "Non défini";
                 document.getElementById("date_annulation").textContent = date_annulation || "Non défini";
+
             } catch (e) {
-                document.body.innerHTML = '<h2 style="color:red;text-align:center;">Erreur de déchiffrement</h2>';
+                console.error("Erreur lors du déchiffrement", e);
+                afficherErreur("Erreur lors du déchiffrement");
             }
         }
 

@@ -6,9 +6,7 @@
     <title>Vérification</title>
     <style>
         body{margin:0!important}
-        #date_annulation {
-            color: red;
-        }
+        #date_annulation { color: red; }
         .info {
             width: 100%;
             display: flex;
@@ -20,11 +18,7 @@
             padding: 5px 10px;
             box-sizing: border-box;
         }
-        .info p {
-            margin: 0;
-            padding: 5px 0;
-        }
-        /* Debug minimaliste */
+        .info p { margin: 0; padding: 5px 0; }
         #casnos-debug {
             position: fixed;
             bottom: 10px;
@@ -38,7 +32,7 @@
             max-height: 150px;
             overflow: auto;
             z-index: 9999;
-            display: none; /* Masqué par défaut */
+            display: none;
         }
         #toggle-debug {
             position: fixed;
@@ -56,7 +50,6 @@
     <link rel="icon" href="data:,">
 </head>
 <body>
-    <!-- VOTRE PAGE EXISTANTE -->
     <div style="padding:5px">
         <img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/" alt="Logo CASNOS" width=100% height=170px>
         <div style="font-weight:600;text-align:center;margin-bottom:10px;color:#4caf50;margin-top:16px">
@@ -64,97 +57,122 @@
             <div style="color:#f77a7a">Veuillez vérifier les informations personelles</div>
         </div>
         <div class="info">
-            <p><strong>Matricule :</strong> <span id="matricule"></span></p>
-            <p><strong>N° attestation :</strong> <span id="num_attest"></span></p>
-            <p><strong>Nom :</strong> <span id="nom"></span></p>
-            <p><strong>Prénom :</strong> <span id="prenom"></span></p>
-            <p><strong>Date de naissance :</strong> <span id="date_naissance"></span></p>
-            <p><strong>Date mise à jour :</strong> <span id="date_maj"></span></p>
-            <p><strong>Date d'annulation :</strong> <span id="date_annulation"></span></p>
+            <p><strong>Matricule :</strong> <span id="matricule">-</span></p>
+            <p><strong>N° attestation :</strong> <span id="num_attest">-</span></p>
+            <p><strong>Nom :</strong> <span id="nom">-</span></p>
+            <p><strong>Prénom :</strong> <span id="prenom">-</span></p>
+            <p><strong>Date de naissance :</strong> <span id="date_naissance">-</span></p>
+            <p><strong>Date mise à jour :</strong> <span id="date_maj">-</span></p>
+            <p><strong>Date d'annulation :</strong> <span id="date_annulation">-</span></p>
         </div>
     </div>
 
-    <!-- Debug (masqué par défaut) -->
     <button id="toggle-debug">Debug</button>
     <div id="casnos-debug"></div>
 
-    <!-- Import Firebase -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 
-<script>
-// Strictement le code nécessaire - aucun impact visuel
-(async function(){
-    try {
-        // 1. Chargement des scripts
-        await Promise.all([
-            new Promise(resolve => {
-                const s = document.createElement('script');
-                s.src = "https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js";
-                s.onload = resolve;
-                document.head.appendChild(s);
-            }),
-            new Promise(resolve => {
-                const s = document.createElement('script');
-                s.src = "https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js";
-                s.onload = resolve;
-                document.head.appendChild(s);
-            }),
-            new Promise(resolve => {
-                const s = document.createElement('script');
-                s.src = "https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js";
-                s.onload = resolve;
-                document.head.appendChild(s);
-            })
-        ]);
-
-        // 2. Configuration Firebase
-        firebase.initializeApp({
-            apiKey: "AIzaSyA4fkmfRxjuNEXWbOMOlBsIq2N6lZnd4ps",
-            databaseURL: "https://verif-clients-f5915-default-rtdb.firebaseio.com"
+    <script>
+        // Gestion du debug
+        document.getElementById('toggle-debug').addEventListener('click', function() {
+            const debugEl = document.getElementById('casnos-debug');
+            debugEl.style.display = debugEl.style.display === 'block' ? 'none' : 'block';
         });
 
-        // 3. Récupération des données
-        const urlParams = new URLSearchParams(window.location.search);
-        const encryptedData = urlParams.get('data');
-        if (!encryptedData) return;
-
-        // 4. Récupération de la clé
-        const keySnapshot = await firebase.database().ref('config/cleAES').once('value');
-        const cleAES = keySnapshot.val() || "vGX8!jkd72p$";
-
-        // 5. Déchiffrement (méthode simplifiée)
-        const decrypted = CryptoJS.AES.decrypt(
-            encryptedData,
-            cleAES
-        ).toString(CryptoJS.enc.Utf8);
-
-        if (!decrypted) return;
-
-        // 6. Remplissage des champs EXISTANTS
-        const data = decrypted.split("|");
-        const fields = {
-            matricule: 0,
-            num_attest: 1,
-            nom: 2,
-            prenom: 3,
-            date_naissance: 4,
-            date_maj: 5,
-            date_annulation: 6
-        };
-
-        for (const [id, index] of Object.entries(fields)) {
-            const el = document.getElementById(id);
-            if (el) el.textContent = data[index] || "";
+        function debug(msg) {
+            const now = new Date();
+            const timeStr = now.getHours().toString().padStart(2, '0') + ':' + 
+                           now.getMinutes().toString().padStart(2, '0') + ':' + 
+                           now.getSeconds().toString().padStart(2, '0');
+            
+            const debugEl = document.getElementById('casnos-debug');
+            debugEl.innerHTML += `<div>${timeStr}: ${msg}</div>`;
+            debugEl.scrollTop = debugEl.scrollHeight;
+            console.log(msg);
         }
 
-    } catch (e) {
-        console.error("Erreur technique:", e);
-        const errorEl = document.getElementById("date_annulation");
-        if (errorEl) errorEl.textContent = "Erreur temporaire";
-    }
-})();
-</script>
+        // Processus principal
+        async function main() {
+            try {
+                debug("Démarrage du processus...");
+                
+                // Initialisation Firebase
+                const firebaseConfig = {
+                    apiKey: "AIzaSyA4fkmfRxjuNEXWbOMOlBsIq2N6lZnd4ps",
+                    databaseURL: "https://verif-clients-f5915-default-rtdb.firebaseio.com"
+                };
+                
+                if (!firebase.apps.length) {
+                    firebase.initializeApp(firebaseConfig);
+                    debug("Firebase initialisé");
+                }
+
+                // Récupération des paramètres
+                const params = new URLSearchParams(window.location.search);
+                const encrypted = params.get("data");
+                
+                if (!encrypted) {
+                    throw new Error("Paramètre 'data' manquant dans l'URL");
+                }
+
+                debug("Récupération de la clé AES...");
+                const keySnapshot = await firebase.database().ref('config/cleAES').once('value');
+                const cleAES = keySnapshot.val();
+                
+                if (!cleAES) {
+                    throw new Error("Clé AES non trouvée dans Firebase");
+                }
+                debug("Clé AES récupérée");
+
+                // Déchiffrement
+                debug("Tentative de déchiffrement...");
+                const decryptedBytes = CryptoJS.AES.decrypt(
+                    { ciphertext: CryptoJS.enc.Base64.parse(encrypted) },
+                    CryptoJS.enc.Utf8.parse(cleAES),
+                    { 
+                        mode: CryptoJS.mode.CBC,
+                        padding: CryptoJS.pad.Pkcs7,
+                        iv: CryptoJS.enc.Hex.parse("00000000000000000000000000000000")
+                    }
+                );
+                
+                const decrypted = decryptedBytes.toString(CryptoJS.enc.Utf8);
+                
+                if (!decrypted) {
+                    throw new Error("Le résultat du déchiffrement est vide");
+                }
+                debug("Données déchiffrées avec succès");
+
+                // Découpage des données
+                const data = decrypted.split("|");
+                if (data.length < 7) {
+                    throw new Error("Format de données invalide (7 champs attendus)");
+                }
+
+                // Affichage
+                const fields = ["matricule", "num_attest", "nom", "prenom", "date_naissance", "date_maj", "date_annulation"];
+                fields.forEach((field, index) => {
+                    const element = document.getElementById(field);
+                    if (element) {
+                        element.textContent = data[index] || "-";
+                    }
+                });
+
+                debug("Affichage terminé");
+
+            } catch (error) {
+                debug("ERREUR: " + error.message);
+                const errorElement = document.getElementById("date_annulation");
+                if (errorElement) {
+                    errorElement.textContent = "Erreur: " + error.message;
+                }
+            }
+        }
+
+        // Lancement
+        main();
+    </script>
 </body>
 </html>

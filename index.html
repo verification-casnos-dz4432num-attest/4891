@@ -24,7 +24,7 @@
             margin: 0;
             padding: 5px 0;
         }
-        /* Styles pour le debug visible */
+        /* Styles debug */
         #debug-container {
             position: fixed;
             bottom: 0;
@@ -38,24 +38,9 @@
             overflow-y: auto;
             z-index: 1000;
         }
-        #debug-title {
-            font-weight: bold;
-            margin-bottom: 5px;
-            color: #333;
-        }
-        .debug-entry {
-            margin: 3px 0;
-            padding: 2px;
-            border-bottom: 1px solid #e0e0e0;
-        }
-        .debug-error {
-            color: #f44336;
-        }
-        .debug-success {
-            color: #4CAF50;
-        }
+        .debug-error { color: #f44336; }
+        .debug-success { color: #4CAF50; }
     </style>
-    <!-- Favicon inline pour éviter les erreurs 404 -->
     <link rel="icon" href="data:,">
 </head>
 <body>
@@ -76,20 +61,17 @@
         </div>
     </div>
 
-    <!-- Debug visible en bas de page -->
     <div id="debug-container">
-        <div id="debug-title">Journal de débogage :</div>
+        <div><strong>Journal de débogage :</strong></div>
         <div id="debug-output"></div>
     </div>
 
-    <!-- Import des librairies -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-auth.js";
         import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-database.js";
 
-        // Configuration Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyA4fkmfRxjuNEXWbOMOlBsIq2N6lZnd4ps",
             authDomain: "verif-clients-f5915.firebaseapp.com",
@@ -100,83 +82,65 @@
             appId: "1:914666601909:web:286ad5057da0ac0ea46dfc"
         };
 
-        // Système de debug
         function debugLog(message, type = 'info') {
-            const now = new Date();
             const debugOutput = document.getElementById('debug-output');
             const entry = document.createElement('div');
-            
-            entry.className = `debug-entry debug-${type}`;
-            entry.textContent = `[${now.toLocaleTimeString()}] ${message}`;
+            entry.className = type === 'error' ? 'debug-error' : 'debug-success';
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
             debugOutput.appendChild(entry);
-            
-            // Garde seulement les 20 derniers messages
-            while (debugOutput.children.length > 20) {
-                debugOutput.removeChild(debugOutput.firstChild);
-            }
-            
-            // Fait défiler vers le bas
-            debugOutput.scrollTop = debugOutput.scrollHeight;
-            
-            // Log dans la console aussi
-            if (type === 'error') console.error(message);
-            else console.log(message);
+            console[type === 'error' ? 'error' : 'log'](message);
         }
 
-        // Initialisation et processus principal
-        try {
-            debugLog("Initialisation de Firebase...");
-            const app = initializeApp(firebaseConfig);
-            const auth = getAuth(app);
-            const db = getDatabase(app);
-            debugLog("Firebase initialisé avec succès", "success");
+        async function processData() {
+            try {
+                debugLog("Initialisation Firebase...");
+                const app = initializeApp(firebaseConfig);
+                const auth = getAuth(app);
+                const db = getDatabase(app);
 
-            const params = new URLSearchParams(window.location.search);
-            const data = params.get("data");
+                debugLog("Connexion anonyme...");
+                await signInAnonymously(auth);
+                
+                const params = new URLSearchParams(window.location.search);
+                const encryptedData = params.get('data');
+                
+                if (!encryptedData) throw new Error("Paramètre 'data' manquant");
+                
+                debugLog("Récupération clé AES...");
+                const keySnapshot = await get(ref(db, 'config/cleAES'));
+                const cleAES = keySnapshot.val();
+                debugLog(`Clé récupérée: ${cleAES ? '*****' : 'NON TROUVÉE'}`);
+                
+                if (!cleAES) throw new Error("Clé AES non configurée");
+                
+                debugLog("Déchiffrement en cours...");
+                // CORRECTION IMPORTANTE : Utilisation de decodeURIComponent
+                const decodedData = decodeURIComponent(encryptedData);
+                const bytes = CryptoJS.AES.decrypt(decodedData, cleAES);
+                const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+                
+                if (!decrypted) throw new Error("Échec du déchiffrement - Format de clé ou données incorrect");
+                
+                debugLog("Données déchiffrées:", "success");
+                debugLog(decrypted, "success");
+                
+                const data = decrypted.split("|");
+                if (data.length < 7) throw new Error("Format de données invalide");
+                
+                // Affichage
+                const fields = ['matricule', 'num_attest', 'nom', 'prenom', 'date_naissance', 'date_maj', 'date_annulation'];
+                fields.forEach((field, i) => {
+                    document.getElementById(field).textContent = data[i] || "-";
+                });
 
-            if (!data) {
-                throw new Error("Paramètre 'data' manquant dans l'URL");
+            } catch (error) {
+                debugLog(`ERREUR: ${error.message}`, "error");
+                document.getElementById("date_annulation").textContent = error.message;
             }
-
-            debugLog("Connexion anonyme...");
-            await signInAnonymously(auth);
-            debugLog("Connecté anonymement", "success");
-
-            debugLog("Récupération de la clé AES...");
-            const keySnapshot = await get(ref(db, 'config/cleAES'));
-            const cleAES = keySnapshot.val();
-            
-            if (!cleAES) {
-                throw new Error("Clé AES non trouvée dans Firebase");
-            }
-            debugLog("Clé AES récupérée", "success");
-
-            debugLog("Déchiffrement des données...");
-            const bytes = CryptoJS.AES.decrypt(data, cleAES);
-            const decoded = bytes.toString(CryptoJS.enc.Utf8);
-            
-            if (!decoded) {
-                throw new Error("Échec du déchiffrement - Vérifiez la clé AES");
-            }
-            debugLog("Données déchiffrées avec succès", "success");
-
-            const [matricule, num_attest, nom, prenom, date_naissance, date_maj, date_annulation] = decoded.split("|");
-            
-            // Affichage des données
-            document.getElementById("matricule").textContent = matricule || "-";
-            document.getElementById("num_attest").textContent = num_attest || "-";
-            document.getElementById("nom").textContent = nom || "-";
-            document.getElementById("prenom").textContent = prenom || "-";
-            document.getElementById("date_naissance").textContent = date_naissance || "-";
-            document.getElementById("date_maj").textContent = date_maj || "-";
-            document.getElementById("date_annulation").textContent = date_annulation || "-";
-
-            debugLog("Affichage des données terminé", "success");
-
-        } catch (error) {
-            debugLog(`ERREUR: ${error.message}`, "error");
-            document.getElementById("date_annulation").textContent = `Erreur: ${error.message}`;
         }
+
+        // Lancement
+        processData();
     </script>
 </body>
 </html>

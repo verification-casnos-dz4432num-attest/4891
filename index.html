@@ -56,76 +56,62 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 
-    <script>
-        // Configuration Firebase
-        const firebaseConfig = {
-            apiKey: "AIzaSyA4fkmfRxjuNEXWbOMOlBsIq2N6lZnd4ps",
-            authDomain: "verif-clients-f5915.firebaseapp.com",
-            databaseURL: "https://verif-clients-f5915-default-rtdb.firebaseio.com",
-            projectId: "verif-clients-f5915",
-            storageBucket: "verif-clients-f5915.appspot.com",
-            messagingSenderId: "914666601909",
-            appId: "1:914666601909:web:286ad5057da0ac0ea46dfc"
-        };
+<script>
+    // Configuration Firebase MODIFIÉE pour le frontend
+    const firebaseConfig = {
+        apiKey: "AIzaSyA4fkmfRxjuNEXWbOMOlBsIq2N6lZnd4ps",
+        authDomain: "verif-clients-f5915.firebaseapp.com",
+        databaseURL: "https://verif-clients-f5915-default-rtdb.firebaseio.com",
+        projectId: "verif-clients-f5915",
+        storageBucket: "verif-clients-f5915.appspot.com",
+        messagingSenderId: "914666601909",
+        appId: "1:914666601909:web:286ad5057da0ac0ea46dfc"
+    };
 
-        // Initialisation
-        const app = firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.database();
-        const debug = document.getElementById('debug-console');
+    // Initialisation SIMPLIFIÉE
+    const app = firebase.initializeApp(firebaseConfig);
+    const auth = app.auth();
+    const db = app.database();
 
-        function log(message) {
-            debug.textContent += `[${new Date().toLocaleTimeString()}] ${message}\n`;
-            console.log(message);
+    function decoderInfos() {
+        const params = new URLSearchParams(window.location.search);
+        let data = params.get("data");
+
+        if (data) {
+            // Connexion anonyme
+            auth.signInAnonymously()
+                .then(() => {
+                    // Récupère la clé AES
+                    return db.ref('config/cleAES').once('value');
+                })
+                .then((snapshot) => {
+                    const cleAES = snapshot.val();
+                    
+                    // Déchiffrement
+                    const bytes = CryptoJS.AES.decrypt(data, cleAES);
+                    const decoded = bytes.toString(CryptoJS.enc.Utf8);
+                    
+                    if (decoded) {
+                        const [matricule, num_attest, nom, prenom, date_naissance, date_maj, date_annulation] = decoded.split("|");
+                        
+                        document.getElementById("matricule").textContent = matricule || "Non défini";
+                        document.getElementById("num_attest").textContent = num_attest || "Non défini";
+                        document.getElementById("nom").textContent = nom || "Non défini";
+                        document.getElementById("prenom").textContent = prenom || "Non défini";
+                        document.getElementById("date_naissance").textContent = date_naissance || "Non défini";
+                        document.getElementById("date_maj").textContent = date_maj || "Non défini";
+                        document.getElementById("date_annulation").textContent = date_annulation || "Non défini";
+                    }
+                })
+                .catch((error) => {
+                    console.error("Erreur:", error);
+                    document.getElementById("date_annulation").textContent = "Erreur de vérification";
+                });
         }
-
-        // Processus principal
-        async function process() {
-            try {
-                log("Connexion Firebase...");
-                await auth.signInAnonymously();
-                
-                const params = new URLSearchParams(window.location.search);
-                const encrypted = params.get('data');
-                const matricule = params.get('matricule');
-
-                if (!matricule) throw new Error("Matricule manquant");
-                if (!encrypted) throw new Error("Données manquantes");
-
-                // Vérification blacklist
-                const blacklistSnap = await db.ref('blacklist/' + matricule).once('value');
-                if (blacklistSnap.exists()) throw new Error("Matricule blacklisté");
-
-                // Récupération clé AES
-                const keySnap = await db.ref('config/cleAES').once('value');
-                const cleAES = keySnap.val();
-                if (!cleAES) throw new Error("Clé AES non trouvée");
-
-                // Déchiffrement
-                const bytes = CryptoJS.AES.decrypt(decodeURIComponent(encrypted), cleAES);
-                const decrypted = bytes.toString(CryptoJS.enc.Utf8);
-                if (!decrypted) throw new Error("Échec déchiffrement");
-
-                const data = decrypted.split('|');
-                if (data.length < 7) throw new Error("Format de données invalide");
-
-                // Affichage
-                document.getElementById('matricule').textContent = data[0] || "Non défini";
-                document.getElementById('num_attest').textContent = data[1] || "Non défini";
-                document.getElementById('nom').textContent = data[2] || "Non défini";
-                document.getElementById('prenom').textContent = data[3] || "Non défini";
-                document.getElementById('date_naissance').textContent = data[4] || "Non défini";
-                document.getElementById('date_maj').textContent = data[5] || "Non défini";
-                document.getElementById('date_annulation').textContent = data[6] || "Non défini";
-
-            } catch (error) {
-                console.error(error);
-                document.getElementById('date_annulation').textContent = "ERREUR : " + error.message;
-            }
-        }
-
-        // Lancement
-        process();
-    </script>
+    }
+    
+    // Lance au chargement
+    window.onload = decoderInfos;
+</script>
 </body>
 </html>

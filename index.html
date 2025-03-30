@@ -3,12 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vérification</title>
+    <title>Vérification sécurisée</title>
     <style>
-        body{margin:0!important}
-        #date_annulation {
-            color: red;
-        }
+        body { margin: 0 !important; font-family: Arial, sans-serif; }
+        #date_annulation { color: red; }
         .info {
             width: 100%;
             display: flex;
@@ -20,85 +18,121 @@
             padding: 5px 10px;
             box-sizing: border-box;
         }
-        .info p {
-            margin: 0;
-            padding: 5px 0;
+        .info p { margin: 0; padding: 5px 0; }
+        #debug-console {
+            background: #f0f0f0;
+            padding: 10px;
+            margin: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
         }
     </style>
+    <!-- Import Firebase et CryptoJS -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 </head>
 <body>
-    <app-root _nghost-sst-c43 ng-version="13.0.3">
-        <div _ngcontent-sst-c43 style="padding:5px" class="ng-star-inserted">
-            <div _ngcontent-sst-c43>
-                <img _ngcontent-sst-c43 src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/" alt="Logo CASNOS" width=100% height=170px>
-                <div _ngcontent-sst-c43>
-                    <div _ngcontent-sst-c43 style=font-weight:600;text-align:center;margin-bottom:10px;color:#4caf50;margin-top:16px class=ng-star-inserted>
-                        <div _ngcontent-sst-c43 style=font-size:18px;margin-bottom:8px>Attestation authentique</div>
-                        <div _ngcontent-sst-c43 style=color:#f77a7a>Veuillez vérifier les informations personelles</div>
-                    </div>
-                </div>
-                <div _ngcontent-sst-c43 class="info">
-                    <p><strong>Matricule :</strong> <span id="matricule"></span></p>
-                    <p><strong>N° attestation :</strong> <span id="num_attest"></span></p>
-                    <p><strong>Nom :</strong> <span id="nom"></span></p>
-                    <p><strong>Prénom :</strong> <span id="prenom"></span></p>
-                    <p><strong>Date de naissance :</strong> <span id="date_naissance"></span></p>
-                    <p><strong>Date mise à jour :</strong> <span id="date_maj"></span></p>
-                    <p><strong>Date d'annulation :</strong> <span id="date_annulation"></span></p>
-                </div>
-            </div>
+    <div style="padding:5px">
+        <img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/" alt="Logo" width=100% height=170px>
+        <div style="font-weight:600; text-align:center; margin-bottom:10px; color:#4caf50; margin-top:16px">
+            <div style="font-size:18px; margin-bottom:8px">Attestation authentique</div>
+            <div style="color:#f77a7a">Veuillez vérifier les informations personnelles</div>
         </div>
-    </app-root>
+        <div class="info">
+            <p><strong>Matricule :</strong> <span id="matricule">Chargement...</span></p>
+            <p><strong>N° attestation :</strong> <span id="num_attest">Chargement...</span></p>
+            <p><strong>Nom :</strong> <span id="nom">Chargement...</span></p>
+            <p><strong>Prénom :</strong> <span id="prenom">Chargement...</span></p>
+            <p><strong>Date de naissance :</strong> <span id="date_naissance">Chargement...</span></p>
+            <p><strong>Date mise à jour :</strong> <span id="date_maj">Chargement...</span></p>
+            <p><strong>Date d'annulation :</strong> <span id="date_annulation">Chargement...</span></p>
+        </div>
+        <div id="debug-console">[DEBUG] Initialisation...</div>
+    </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script>
-        const AES_KEY = "vGX8!jkd72p$";
-        const BLACKLIST = ["99999", "88888"];
+        // Config Firebase (remplace avec tes infos si besoin)
+        const firebaseConfig = {
+            apiKey: "AIzaSyA4fkmfRxjuNEXWbOMOlBsIq2N6lZnd4ps",
+            authDomain: "verif-clients-f5915.firebaseapp.com",
+            databaseURL: "https://verif-clients-f5915-default-rtdb.firebaseio.com",
+            projectId: "verif-clients-f5915",
+            storageBucket: "verif-clients-f5915.appspot.com",
+            messagingSenderId: "914666601909",
+            appId: "1:914666601909:web:286ad5057da0ac0ea46dfc"
+        };
 
-        function afficherErreur(message) {
-            document.body.innerHTML = '<h2 style="color:red;text-align:center;">' + message + '</h2>';
+        // Initialisation Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.database();
+        const debugConsole = document.getElementById('debug-console');
+
+        // Fonction pour logger les étapes
+        function logDebug(message) {
+            debugConsole.textContent += `\n[${new Date().toLocaleTimeString()}] ${message}`;
+            console.log(message);
         }
 
-        function verifierClient() {
+        // 1. Connexion anonyme
+        logDebug("Tentative de connexion anonyme Firebase...");
+        signInAnonymously(auth)
+            .then(() => {
+                logDebug("✅ Connecté anonymement. UID: " + auth.currentUser.uid);
+                
+                // 2. Récupération de la clé AES depuis Firebase
+                logDebug("Récupération de la clé AES...");
+                const keyRef = db.ref('config/cleAES');
+                keyRef.once('value').then((snapshot) => {
+                    const cleAES = snapshot.val();
+                    logDebug("✅ Clé AES récupérée: " + cleAES.replace(/./g, '*')); // Masquée pour la sécurité
+
+                    // 3. Décodage des données de l'URL
+                    decoderInfos(cleAES);
+                }).catch((error) => {
+                    logDebug("❌ Erreur accès clé AES: " + error.message);
+                });
+            })
+            .catch((error) => {
+                logDebug("❌ Erreur connexion anonyme: " + error.message);
+            });
+
+        // Fonction pour décoder les données (avec AES)
+        function decoderInfos(cleAES) {
             const params = new URLSearchParams(window.location.search);
-            const id = params.get("id");
-            let token = params.get("token");
-            
-            console.log("[DEBUG 1] ID reçu :", id);
-            console.log("[DEBUG 2] Token brut reçu :", token);
-            
-            if (!id || !token) {
-                afficherErreur("Lien invalide (paramètres manquants)");
+            const data = params.get("data");
+
+            if (!data) {
+                logDebug("❌ Aucun paramètre 'data' dans l'URL");
                 return;
             }
 
-            if (BLACKLIST.includes(id)) {
-                afficherErreur("Client non validé (BlackList)");
-                return;
-            }
-
+            logDebug("Déchiffrement des données...");
             try {
-                token = decodeURIComponent(token);
-                console.log("[DEBUG 3] Token après decodeURIComponent :", token);
-
-                const bytes = CryptoJS.AES.decrypt(token, AES_KEY);
-                const decryptedData = bytes.toString(CryptoJS.enc.Utf8);
-                console.log("[DEBUG 4] Token déchiffré :", decryptedData);
-
-                const dataParts = decryptedData.split("|");
-                console.log("[DEBUG 5] Données extraites :", dataParts);
-
-                if (dataParts[0] !== id) {
-                    console.log("[DEBUG 6] Comparaison ID :", dataParts[0], "!==", id, "(invalide ❌)");
-                    afficherErreur("Client non validé (mauvais token)");
+                // Décodage Base64 -> AES -> Données claires
+                const bytes = CryptoJS.AES.decrypt(data, cleAES);
+                const decoded = bytes.toString(CryptoJS.enc.Utf8);
+                
+                if (!decoded) {
+                    logDebug("❌ Clé AES invalide ou données corrompues");
                     return;
                 }
 
-                console.log("[DEBUG 6] Comparaison ID :", dataParts[0], "===", id, "(valide ✅)");
-                console.log("[DEBUG 7] Injection des données dans la page...");
+                logDebug("✅ Données déchiffrées: " + decoded);
+                const [matricule, num_attest, nom, prenom, date_naissance, date_maj, date_annulation] = decoded.split("|");
 
-                const [matricule, num_attest, nom, prenom, date_naissance, date_maj, date_annulation] = dataParts;
+                // Vérification blacklist (exemple)
+                const isBlacklisted = matricule === "123456"; // À remplacer par une vraie vérification Firebase
+                if (isBlacklisted) {
+                    logDebug("❌ Matricule blacklisté !");
+                    alert("Accès refusé : matricule blacklisté.");
+                    return;
+                }
 
+                // Affichage des données
                 document.getElementById("matricule").textContent = matricule || "Non défini";
                 document.getElementById("num_attest").textContent = num_attest || "Non défini";
                 document.getElementById("nom").textContent = nom || "Non défini";
@@ -108,12 +142,9 @@
                 document.getElementById("date_annulation").textContent = date_annulation || "Non défini";
 
             } catch (e) {
-                console.error("Erreur lors du déchiffrement", e);
-                afficherErreur("Erreur lors du déchiffrement");
+                logDebug("❌ Erreur déchiffrement: " + e.message);
             }
         }
-
-        verifierClient();
     </script>
 </body>
 </html>

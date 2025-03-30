@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vérification CASNOS</title>
-    <!-- Favicon inline pour éviter la requête 404 -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔍</text></svg>">
+    <title>Vérification</title>
     <style>
-        body { margin: 0 !important; font-family: Arial, sans-serif; }
-        #date_annulation { color: red; }
+        body{margin:0!important}
+        #date_annulation {
+            color: red;
+        }
         .info {
             width: 100%;
             display: flex;
@@ -20,27 +20,43 @@
             padding: 5px 10px;
             box-sizing: border-box;
         }
-        .info p { margin: 0; padding: 5px 0; }
-        
-        /* Debug panel - À supprimer en production */
-        #debug-console {
+        .info p {
+            margin: 0;
+            padding: 5px 0;
+        }
+        /* Styles pour le debug visible */
+        #debug-container {
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
-            background: #f0f0f0;
-            border-top: 1px solid #ccc;
+            background: #f5f5f5;
+            border-top: 2px solid #4CAF50;
             padding: 10px;
             font-family: monospace;
-            font-size: 12px;
-            max-height: 150px;
+            max-height: 200px;
             overflow-y: auto;
             z-index: 1000;
         }
-        .debug-entry { margin: 2px 0; }
-        .debug-error { color: #d32f2f; }
-        .debug-success { color: #388e3c; }
+        #debug-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        .debug-entry {
+            margin: 3px 0;
+            padding: 2px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .debug-error {
+            color: #f44336;
+        }
+        .debug-success {
+            color: #4CAF50;
+        }
     </style>
+    <!-- Favicon inline pour éviter les erreurs 404 -->
+    <link rel="icon" href="data:,">
 </head>
 <body>
     <div style="padding:5px">
@@ -60,42 +76,18 @@
         </div>
     </div>
 
-    <!-- Debug Console - À supprimer en production -->
-    <div id="debug-console">
-        <strong>Console de débogage :</strong>
+    <!-- Debug visible en bas de page -->
+    <div id="debug-container">
+        <div id="debug-title">Journal de débogage :</div>
         <div id="debug-output"></div>
     </div>
 
-    <!-- Firebase 8 (version stable) -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <!-- Import des librairies -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-
-    <script>
-        // Système de debug
-        function debugLog(message, type = 'info') {
-            const now = new Date();
-            const timeStr = now.toLocaleTimeString();
-            const debugOutput = document.getElementById('debug-output');
-            
-            const entry = document.createElement('div');
-            entry.className = `debug-entry debug-${type}`;
-            entry.textContent = `[${timeStr}] ${message}`;
-            debugOutput.appendChild(entry);
-            
-            // Garde seulement les 50 derniers messages
-            while (debugOutput.children.length > 50) {
-                debugOutput.removeChild(debugOutput.firstChild);
-            }
-            
-            // Fait défiler vers le bas
-            debugOutput.scrollTop = debugOutput.scrollHeight;
-            
-            // Log dans la console aussi
-            if (type === 'error') console.error(message);
-            else console.log(message);
-        }
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-auth.js";
+        import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-database.js";
 
         // Configuration Firebase
         const firebaseConfig = {
@@ -108,71 +100,82 @@
             appId: "1:914666601909:web:286ad5057da0ac0ea46dfc"
         };
 
-        // Initialisation
+        // Système de debug
+        function debugLog(message, type = 'info') {
+            const now = new Date();
+            const debugOutput = document.getElementById('debug-output');
+            const entry = document.createElement('div');
+            
+            entry.className = `debug-entry debug-${type}`;
+            entry.textContent = `[${now.toLocaleTimeString()}] ${message}`;
+            debugOutput.appendChild(entry);
+            
+            // Garde seulement les 20 derniers messages
+            while (debugOutput.children.length > 20) {
+                debugOutput.removeChild(debugOutput.firstChild);
+            }
+            
+            // Fait défiler vers le bas
+            debugOutput.scrollTop = debugOutput.scrollHeight;
+            
+            // Log dans la console aussi
+            if (type === 'error') console.error(message);
+            else console.log(message);
+        }
+
+        // Initialisation et processus principal
         try {
-            debugLog("Initialisation de l'application...");
-            
-            // Initialise Firebase
-            firebase.initializeApp(firebaseConfig);
-            const auth = firebase.auth();
-            const db = firebase.database();
-            
+            debugLog("Initialisation de Firebase...");
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const db = getDatabase(app);
             debugLog("Firebase initialisé avec succès", "success");
+
+            const params = new URLSearchParams(window.location.search);
+            const data = params.get("data");
+
+            if (!data) {
+                throw new Error("Paramètre 'data' manquant dans l'URL");
+            }
+
+            debugLog("Connexion anonyme...");
+            await signInAnonymously(auth);
+            debugLog("Connecté anonymement", "success");
+
+            debugLog("Récupération de la clé AES...");
+            const keySnapshot = await get(ref(db, 'config/cleAES'));
+            const cleAES = keySnapshot.val();
             
-            // Processus principal
-            auth.signInAnonymously()
-                .then(() => {
-                    debugLog("Authentification anonyme réussie", "success");
-                    
-                    // Récupère les paramètres URL
-                    const params = new URLSearchParams(window.location.search);
-                    const encryptedData = params.get('data');
-                    
-                    if (!encryptedData) {
-                        throw new Error("Paramètre 'data' manquant dans l'URL");
-                    }
-                    
-                    debugLog("Récupération de la clé AES...");
-                    return db.ref('config/cleAES').once('value');
-                })
-                .then((snapshot) => {
-                    const cleAES = snapshot.val();
-                    if (!cleAES) throw new Error("Clé AES non trouvée dans Firebase");
-                    
-                    debugLog("Clé AES récupérée", "success");
-                    
-                    // Déchiffrement
-                    const params = new URLSearchParams(window.location.search);
-                    const encryptedData = params.get('data');
-                    const bytes = CryptoJS.AES.decrypt(encryptedData, cleAES);
-                    const decrypted = bytes.toString(CryptoJS.enc.Utf8);
-                    
-                    if (!decrypted) throw new Error("Échec du déchiffrement - Vérifiez la clé AES");
-                    
-                    debugLog("Données déchiffrées avec succès", "success");
-                    debugLog("Contenu déchiffré: " + decrypted);
-                    
-                    // Extraction des données
-                    const [matricule, num_attest, nom, prenom, date_naissance, date_maj, date_annulation] = decrypted.split("|");
-                    
-                    // Affichage
-                    document.getElementById("matricule").textContent = matricule || "-";
-                    document.getElementById("num_attest").textContent = num_attest || "-";
-                    document.getElementById("nom").textContent = nom || "-";
-                    document.getElementById("prenom").textContent = prenom || "-";
-                    document.getElementById("date_naissance").textContent = date_naissance || "-";
-                    document.getElementById("date_maj").textContent = date_maj || "-";
-                    document.getElementById("date_annulation").textContent = date_annulation || "-";
-                    
-                    debugLog("Affichage des données terminé", "success");
-                })
-                .catch((error) => {
-                    debugLog("ERREUR: " + error.message, "error");
-                    document.getElementById("date_annulation").textContent = "Erreur: " + error.message;
-                });
-                
+            if (!cleAES) {
+                throw new Error("Clé AES non trouvée dans Firebase");
+            }
+            debugLog("Clé AES récupérée", "success");
+
+            debugLog("Déchiffrement des données...");
+            const bytes = CryptoJS.AES.decrypt(data, cleAES);
+            const decoded = bytes.toString(CryptoJS.enc.Utf8);
+            
+            if (!decoded) {
+                throw new Error("Échec du déchiffrement - Vérifiez la clé AES");
+            }
+            debugLog("Données déchiffrées avec succès", "success");
+
+            const [matricule, num_attest, nom, prenom, date_naissance, date_maj, date_annulation] = decoded.split("|");
+            
+            // Affichage des données
+            document.getElementById("matricule").textContent = matricule || "-";
+            document.getElementById("num_attest").textContent = num_attest || "-";
+            document.getElementById("nom").textContent = nom || "-";
+            document.getElementById("prenom").textContent = prenom || "-";
+            document.getElementById("date_naissance").textContent = date_naissance || "-";
+            document.getElementById("date_maj").textContent = date_maj || "-";
+            document.getElementById("date_annulation").textContent = date_annulation || "-";
+
+            debugLog("Affichage des données terminé", "success");
+
         } catch (error) {
-            debugLog("ERREUR D'INITIALISATION: " + error.message, "error");
+            debugLog(`ERREUR: ${error.message}`, "error");
+            document.getElementById("date_annulation").textContent = `Erreur: ${error.message}`;
         }
     </script>
 </body>

@@ -74,105 +74,113 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 
-    <script>
-        // Gestion du debug
-        document.getElementById('toggle-debug').addEventListener('click', function() {
-            const debugEl = document.getElementById('casnos-debug');
-            debugEl.style.display = debugEl.style.display === 'block' ? 'none' : 'block';
+<script>
+// Gestion du debug
+document.getElementById('toggle-debug').addEventListener('click', function() {
+    const debugEl = document.getElementById('casnos-debug');
+    debugEl.style.display = debugEl.style.display === 'block' ? 'none' : 'block';
+});
+
+function debug(msg) {
+    const debugEl = document.getElementById('casnos-debug');
+    debugEl.innerHTML += `<div>${new Date().toLocaleTimeString()}: ${msg}</div>`;
+    console.log(msg);
+    debugEl.scrollTop = debugEl.scrollHeight;
+}
+
+// Méthode de déchiffrement corrigée
+function decryptAES(encrypted, key) {
+    try {
+        // 1. Décodage URL-safe
+        const decoded = decodeURIComponent(encrypted);
+        
+        // 2. Conversion Base64
+        const parsed = CryptoJS.enc.Base64.parse(decoded);
+        
+        // 3. Déchiffrement avec padding explicite
+        const decrypted = CryptoJS.AES.decrypt(
+            { ciphertext: parsed },
+            CryptoJS.enc.Utf8.parse(key),
+            {
+                mode: CryptoJS.mode.CBC,
+                padding: CryptoJS.pad.Pkcs7,
+                iv: CryptoJS.enc.Hex.parse("00000000000000000000000000000000")
+            }
+        );
+        
+        return decrypted.toString(CryptoJS.enc.Utf8);
+    } catch (e) {
+        debug("Erreur technique lors du déchiffrement: " + e);
+        return null;
+    }
+}
+
+// Processus principal
+async function main() {
+    try {
+        debug("Initialisation...");
+        
+        // Configuration Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyA4fkmfRxjuNEXWbOMOlBsIq2N6lZnd4ps",
+            databaseURL: "https://verif-clients-f5915-default-rtdb.firebaseio.com"
+        };
+        
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+            debug("Firebase initialisé");
+        }
+
+        // Récupération paramètres
+        const params = new URLSearchParams(window.location.search);
+        const encrypted = params.get("data");
+        
+        if (!encrypted) {
+            throw new Error("Paramètre 'data' manquant");
+        }
+
+        debug("Récupération clé AES...");
+        const keySnapshot = await firebase.database().ref('config/cleAES').once('value');
+        const cleAES = keySnapshot.val();
+        
+        if (!cleAES) {
+            throw new Error("Clé AES non trouvée dans Firebase");
+        }
+        debug("Clé récupérée");
+
+        // Déchiffrement
+        debug("Déchiffrement en cours...");
+        const decrypted = decryptAES(encrypted, cleAES);
+        
+        if (!decrypted) {
+            throw new Error("Échec du déchiffrement - Vérifiez la clé et les données");
+        }
+        debug("Données déchiffrées: " + decrypted);
+
+        // Traitement des données
+        const data = decrypted.split("|");
+        if (data.length < 7) {
+            throw new Error("Format invalide (7 champs attendus)");
+        }
+
+        // Affichage
+        const ids = ["matricule", "num_attest", "nom", "prenom", "date_naissance", "date_maj", "date_annulation"];
+        ids.forEach((id, i) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = data[i] || "-";
         });
 
-        function debug(msg) {
-            const now = new Date();
-            const timeStr = now.getHours().toString().padStart(2, '0') + ':' + 
-                           now.getMinutes().toString().padStart(2, '0') + ':' + 
-                           now.getSeconds().toString().padStart(2, '0');
-            
-            const debugEl = document.getElementById('casnos-debug');
-            debugEl.innerHTML += `<div>${timeStr}: ${msg}</div>`;
-            debugEl.scrollTop = debugEl.scrollHeight;
-            console.log(msg);
-        }
+        debug("Affichage terminé");
 
-        // Processus principal
-        async function main() {
-            try {
-                debug("Démarrage du processus...");
-                
-                // Initialisation Firebase
-                const firebaseConfig = {
-                    apiKey: "AIzaSyA4fkmfRxjuNEXWbOMOlBsIq2N6lZnd4ps",
-                    databaseURL: "https://verif-clients-f5915-default-rtdb.firebaseio.com"
-                };
-                
-                if (!firebase.apps.length) {
-                    firebase.initializeApp(firebaseConfig);
-                    debug("Firebase initialisé");
-                }
+    } catch (error) {
+        debug("ERREUR: " + error.message);
+        const errorEl = document.getElementById("date_annulation");
+        if (errorEl) errorEl.textContent = error.message;
+    }
+}
 
-                // Récupération des paramètres
-                const params = new URLSearchParams(window.location.search);
-                const encrypted = params.get("data");
-                
-                if (!encrypted) {
-                    throw new Error("Paramètre 'data' manquant dans l'URL");
-                }
-
-                debug("Récupération de la clé AES...");
-                const keySnapshot = await firebase.database().ref('config/cleAES').once('value');
-                const cleAES = keySnapshot.val();
-                
-                if (!cleAES) {
-                    throw new Error("Clé AES non trouvée dans Firebase");
-                }
-                debug("Clé AES récupérée");
-
-                // Déchiffrement
-                debug("Tentative de déchiffrement...");
-                const decryptedBytes = CryptoJS.AES.decrypt(
-                    { ciphertext: CryptoJS.enc.Base64.parse(encrypted) },
-                    CryptoJS.enc.Utf8.parse(cleAES),
-                    { 
-                        mode: CryptoJS.mode.CBC,
-                        padding: CryptoJS.pad.Pkcs7,
-                        iv: CryptoJS.enc.Hex.parse("00000000000000000000000000000000")
-                    }
-                );
-                
-                const decrypted = decryptedBytes.toString(CryptoJS.enc.Utf8);
-                
-                if (!decrypted) {
-                    throw new Error("Le résultat du déchiffrement est vide");
-                }
-                debug("Données déchiffrées avec succès");
-
-                // Découpage des données
-                const data = decrypted.split("|");
-                if (data.length < 7) {
-                    throw new Error("Format de données invalide (7 champs attendus)");
-                }
-
-                // Affichage
-                const fields = ["matricule", "num_attest", "nom", "prenom", "date_naissance", "date_maj", "date_annulation"];
-                fields.forEach((field, index) => {
-                    const element = document.getElementById(field);
-                    if (element) {
-                        element.textContent = data[index] || "-";
-                    }
-                });
-
-                debug("Affichage terminé");
-
-            } catch (error) {
-                debug("ERREUR: " + error.message);
-                const errorElement = document.getElementById("date_annulation");
-                if (errorElement) {
-                    errorElement.textContent = "Erreur: " + error.message;
-                }
-            }
-        }
-
-        // Lancement
-        main();
-    </script>
+// Lancement
+main();
+</script>
 </body>
 </html>

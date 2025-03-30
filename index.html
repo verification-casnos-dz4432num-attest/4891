@@ -6,9 +6,7 @@
     <title>Vérification</title>
     <style>
         body{margin:0!important}
-        #date_annulation {
-            color: red;
-        }
+        #date_annulation { color: red; }
         .info {
             width: 100%;
             display: flex;
@@ -20,15 +18,8 @@
             padding: 5px 10px;
             box-sizing: border-box;
         }
-        .info p {
-            margin: 0;
-            padding: 5px 0;
-        }
-        #debug-console {
-            display: none; /* Masqué par défaut */
-        }
+        .info p { margin: 0; padding: 5px 0; }
     </style>
-    <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAA...">
 </head>
 <body>
     <div style="padding:5px">
@@ -46,72 +37,67 @@
             <p><strong>Date mise à jour :</strong> <span id="date_maj"></span></p>
             <p><strong>Date d'annulation :</strong> <span id="date_annulation"></span></p>
         </div>
-        <!-- Console debug masquée -->
-        <div id="debug-console"></div>
     </div>
 
-    <!-- Librairies -->
-    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <!-- Nouvelle méthode Firebase (Modular SDK) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-auth.js";
+        import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-database.js";
 
-<script>
-    // Configuration Firebase MODIFIÉE pour le frontend
-    const firebaseConfig = {
-        apiKey: "AIzaSyA4fkmfRxjuNEXWbOMOlBsIq2N6lZnd4ps",
-        authDomain: "verif-clients-f5915.firebaseapp.com",
-        databaseURL: "https://verif-clients-f5915-default-rtdb.firebaseio.com",
-        projectId: "verif-clients-f5915",
-        storageBucket: "verif-clients-f5915.appspot.com",
-        messagingSenderId: "914666601909",
-        appId: "1:914666601909:web:286ad5057da0ac0ea46dfc"
-    };
+        const firebaseConfig = {
+            apiKey: "AIzaSyA4fkmfRxjuNEXWbOMOlBsIq2N6lZnd4ps",
+            authDomain: "verif-clients-f5915.firebaseapp.com",
+            databaseURL: "https://verif-clients-f5915-default-rtdb.firebaseio.com",
+            projectId: "verif-clients-f5915",
+            storageBucket: "verif-clients-f5915.appspot.com",
+            messagingSenderId: "914666601909",
+            appId: "1:914666601909:web:286ad5057da0ac0ea46dfc"
+        };
 
-    // Initialisation SIMPLIFIÉE
-    const app = firebase.initializeApp(firebaseConfig);
-    const auth = app.auth();
-    const db = app.database();
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getDatabase(app);
 
-    function decoderInfos() {
-        const params = new URLSearchParams(window.location.search);
-        let data = params.get("data");
+        async function decoderInfos() {
+            const params = new URLSearchParams(window.location.search);
+            const data = params.get("data");
 
-        if (data) {
-            // Connexion anonyme
-            auth.signInAnonymously()
-                .then(() => {
-                    // Récupère la clé AES
-                    return db.ref('config/cleAES').once('value');
-                })
-                .then((snapshot) => {
-                    const cleAES = snapshot.val();
+            if (data) {
+                try {
+                    // Connexion anonyme
+                    await signInAnonymously(auth);
+                    
+                    // Récupération clé AES
+                    const keySnapshot = await get(ref(db, 'config/cleAES'));
+                    const cleAES = keySnapshot.val();
                     
                     // Déchiffrement
                     const bytes = CryptoJS.AES.decrypt(data, cleAES);
                     const decoded = bytes.toString(CryptoJS.enc.Utf8);
+                    const [matricule, num_attest, nom, prenom, date_naissance, date_maj, date_annulation] = decoded.split("|");
                     
-                    if (decoded) {
-                        const [matricule, num_attest, nom, prenom, date_naissance, date_maj, date_annulation] = decoded.split("|");
-                        
-                        document.getElementById("matricule").textContent = matricule || "Non défini";
-                        document.getElementById("num_attest").textContent = num_attest || "Non défini";
-                        document.getElementById("nom").textContent = nom || "Non défini";
-                        document.getElementById("prenom").textContent = prenom || "Non défini";
-                        document.getElementById("date_naissance").textContent = date_naissance || "Non défini";
-                        document.getElementById("date_maj").textContent = date_maj || "Non défini";
-                        document.getElementById("date_annulation").textContent = date_annulation || "Non défini";
-                    }
-                })
-                .catch((error) => {
+                    // Affichage
+                    document.getElementById("matricule").textContent = matricule || "Non défini";
+                    document.getElementById("num_attest").textContent = num_attest || "Non défini";
+                    document.getElementById("nom").textContent = nom || "Non défini";
+                    document.getElementById("prenom").textContent = prenom || "Non défini";
+                    document.getElementById("date_naissance").textContent = date_naissance || "Non défini";
+                    document.getElementById("date_maj").textContent = date_maj || "Non défini";
+                    document.getElementById("date_annulation").textContent = date_annulation || "Non défini";
+                    
+                } catch (error) {
                     console.error("Erreur:", error);
                     document.getElementById("date_annulation").textContent = "Erreur de vérification";
-                });
+                }
+            }
         }
-    }
-    
-    // Lance au chargement
-    window.onload = decoderInfos;
-</script>
+
+        // Lancement
+        decoderInfos();
+    </script>
+
+    <!-- CryptoJS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 </body>
 </html>
